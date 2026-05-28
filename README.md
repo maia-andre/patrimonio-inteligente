@@ -1,8 +1,10 @@
-# 🏷️ RFID POC (Proof of Concept)
+# 🏷️ RFID POC - Inventário Patrimonial
 
 Bem-vindo ao projeto **RFID POC**, uma prova de conceito focada na integração de hardware embarcado (ESP32) com um aplicativo móvel nativo (Android/Kotlin) utilizando comunicação **Bluetooth Low Energy (BLE)**.
 
-Atualmente, o projeto concluiu sua etapa fundacional (Fases 1 e 2), estabelecendo um canal de comunicação bidirecional robusto entre o smartphone e o microcontrolador, permitindo o controle remoto de hardware (LED) com confirmação em tempo real.
+O intuito desta POC é desenvolver uma solução integrada (App + Leitor + Módulo ESP32) para a detecção de **Tags RFID UHF** anexadas a bens móveis (números de placas patrimoniais). O objetivo final é automatizar e agilizar o controle e inventário patrimonial do setor público de São José dos Campos (SJC).
+
+Atualmente, o projeto concluiu sua etapa fundacional (Fases 1 e 2), estabelecendo um canal de comunicação bidirecional robusto entre o smartphone e o microcontrolador, validando o envio de comandos e o recebimento de respostas em tempo real.
 
 ---
 
@@ -26,7 +28,7 @@ graph TD
     subgraph Hardware [🔌 ESP32 DevKit V1]
         FIRM[Firmware C++]
         LED((LED Onboard))
-        RFID[[Leitor RFID - Futuro]]
+        RFID[[Leitor RFID UHF]]
         
         FIRM -->|GPIO 2| LED
         FIRM -.->|SPI| RFID
@@ -64,13 +66,13 @@ Neste exato momento, o projeto permite:
 
 ---
 
-## 🚀 Próximos Passos (Evolução para RFID)
+## 🚀 Próximos Passos (Evolução para Inventário RFID UHF)
 
-Com a espinha dorsal de comunicação BLE validada, a base está pronta para a verdadeira natureza da "Proof of Concept": **A integração do leitor RFID**.
+Com a espinha dorsal de comunicação BLE validada, a base está pronta para a verdadeira natureza da "Proof of Concept": **A integração do módulo leitor RFID UHF**.
 
 ### Próximas Implementações Esperadas:
-- [ ] **Integração de Hardware (ESP32 + Leitor)**: Conectar um leitor RFID (ex: MFRC522) ao ESP32 via barramento SPI.
-- [ ] **Firmware RFID**: Implementar a lógica no ESP32 para detectar a aproximação de um cartão/tag.
-- [ ] **Notificação Proativa via BLE**: Quando uma tag for lida, o ESP32 enviará automaticamente o UID do cartão pela característica TX (`TAG_DETECTED: A1B2C3D4`) sem precisar ser perguntado.
-- [ ] **App Android (Leitura e Processamento)**: O aplicativo Android receberá o UID, fará o parsing da mensagem e exibirá os dados da Tag na tela (podendo, no futuro, consultar uma base de dados externa ou API para liberar uma catraca ou porta).
-- [ ] **Refatoração UI/UX**: Melhorar a interface do aplicativo para focar em "Auditoria de Acessos" em vez de um simples painel de botões.
+- [ ] **Integração de Hardware (ESP32 + Leitor UHF)**: Conectar um leitor RFID UHF compatível ao ESP32 (via UART ou SPI).
+- [ ] **Firmware de Leitura Patrimonial**: Implementar a lógica no ESP32 para realizar a varredura contínua ou sob demanda e detectar Tags RFID UHF (EPC) das placas patrimoniais.
+- [ ] **Notificação Proativa via BLE**: Quando uma tag patrimonial for lida, o ESP32 enviará automaticamente o código/número da placa pela característica TX (`TAG_READ: SJC-123456`) de forma assíncrona.
+- [ ] **App Android (Inventário e Processamento)**: O aplicativo Android receberá o número da placa patrimonial e o processará na tela, permitindo a contagem rápida e a reconciliação de itens durante o processo de inventário.
+- [ ] **Refatoração UI/UX**: Melhorar a interface do aplicativo para focar em "Auditoria e Inventário de Bens" (listagens de itens lidos, contadores) em vez de um simples painel de botões.
