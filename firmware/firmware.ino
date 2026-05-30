@@ -1,4 +1,6 @@
 #include <Arduino.h>
+#include <BLEDevice.h>
+#include <BLEServer.h>
 #include "led_controller.h"
 #include "ble_service.h"
 

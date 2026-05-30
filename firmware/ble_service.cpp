@@ -42,16 +42,19 @@ class MyCallbacks: public BLECharacteristicCallbacks {
         Serial.print("[RX] Recebido: ");
         Serial.println(rxValue);
 
-        // Lógica de controle do LED baseada no comando recebido
+        // Lógica de controle: simula scanner patrimonial
         if (rxValue == "LED_ON") {
             led.turnOn();
-            Serial.println("[LED] ON");
-            sendBLENotification("OK_LED_ON");
+            Serial.println("[SCANNER] Escaneando...");
+            // Simula um pequeno atraso de leitura do leitor RFID UHF
+            delay(800);
+            // Envia a mensagem simulada de ativo encontrado
+            sendBLELongMessage("Placa Patrimonial 147258 - Notebook Positivo encontrado e registrado no inventario da unidade 124 - Departamento de Planejamento e Gestao de Recursos.");
         } 
         else if (rxValue == "LED_OFF") {
             led.turnOff();
-            Serial.println("[LED] OFF");
-            sendBLENotification("OK_LED_OFF");
+            Serial.println("[SCANNER] Desligado");
+            sendBLENotification("SCANNER_OFF");
         }
       }
     }
@@ -102,9 +105,35 @@ void setupBLE() {
 
 void sendBLENotification(const char* message) {
     if (deviceConnected && pTxCharacteristic != NULL) {
-        pTxCharacteristic->setValue(std::string(message));
+        pTxCharacteristic->setValue(String(message));
         pTxCharacteristic->notify();
         Serial.print("[TX] Enviado: ");
         Serial.println(message);
     }
+}
+
+void sendBLELongMessage(const char* message) {
+    if (!deviceConnected || pTxCharacteristic == NULL) return;
+
+    String fullMsg = String(message);
+    int len = fullMsg.length();
+    int chunkSize = 20; // Limite seguro por pacote BLE
+
+    Serial.print("[TX] Enviando mensagem longa (");
+    Serial.print(len);
+    Serial.println(" bytes)...");
+
+    for (int i = 0; i < len; i += chunkSize) {
+        String chunk = fullMsg.substring(i, min(i + chunkSize, len));
+        pTxCharacteristic->setValue(chunk);
+        pTxCharacteristic->notify();
+        delay(50); // Pequeno intervalo entre pacotes para o Android processar
+    }
+
+    // Envia marcador de fim de mensagem
+    delay(50);
+    pTxCharacteristic->setValue(String("__END__"));
+    pTxCharacteristic->notify();
+
+    Serial.println("[TX] Mensagem longa enviada com sucesso.");
 }
