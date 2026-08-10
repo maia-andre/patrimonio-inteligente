@@ -1,0 +1,43 @@
+Patrimônio Inteligente
+Modernização do inventário patrimonial público com RFID UHF
+
+Copyright 2026 André Maia e colaboradores
+
+Licenciado sob a Apache License, Version 2.0 (a "Licença"); você não pode
+usar os arquivos deste projeto exceto em conformidade com a Licença.
+Uma cópia da Licença acompanha este repositório no arquivo LICENSE e pode
+ser obtida em: http://www.apache.org/licenses/LICENSE-2.0
+
+--------------------------------------------------------------------------
+ORIGEM INSTITUCIONAL
+--------------------------------------------------------------------------
+
+Este projeto foi concebido e desenvolvido no âmbito do Departamento de
+Planejamento e Gestão de Recursos (DPGR) da Prefeitura de São José dos
+Campos - SP, a partir da necessidade real de modernização do controle
+patrimonial do município.
+
+--------------------------------------------------------------------------
+AVISO DE TITULARIDADE (EM FORMALIZAÇÃO)
+--------------------------------------------------------------------------
+
+Nos termos do art. 4º da Lei nº 9.609/1998, os direitos sobre programa de
+computador desenvolvido por servidor no exercício de suas funções pertencem,
+em regra, ao ente empregador.
+
+A formalização da titularidade e da autorização institucional de publicação
+em código aberto encontra-se em curso junto aos setores competentes do
+Município. Até a conclusão desse trâmite, este repositório deve ser tratado
+como divulgação técnica de prova de conceito.
+
+Terceiros que desejem adotar, adaptar ou integrar este projeto são
+bem-vindos a fazê-lo nos termos da Apache License 2.0, e são convidados a
+entrar em contato para acompanhar a conclusão desse processo.
+
+--------------------------------------------------------------------------
+DOCUMENTAÇÃO
+--------------------------------------------------------------------------
+
+Salvo indicação em contrário, os arquivos de documentação sob docs/ são
+disponibilizados sob a licença Creative Commons Atribuição 4.0 Internacional
+(CC BY 4.0): https://creativecommons.org/licenses/by/4.0/deed.pt-br

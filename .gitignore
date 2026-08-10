@@ -13,3 +13,12 @@
 .externalNativeBuild
 .cxx
 local.properties
+
+# Material de negociação interna — não versionar em repositório público.
+# Contém dados institucionais e valores em aberto ainda não aprovados.
+/docs/*.pdf
+/docs/*.pptx
+/docs/*.docx
+
+# Correspondência institucional e documentos nominais.
+/docs/interno/

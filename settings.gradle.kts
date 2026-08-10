@@ -22,5 +22,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "rfidpoc"
+rootProject.name = "patrimonio-inteligente"
 include(":app")
