@@ -10,9 +10,9 @@ Antes de qualquer coisa: **você não precisa escrever código para contribuir.*
 
 ### 1. 🔬 Acesso a um leitor RFID UHF
 
-O projeto está bloqueado por uma compra de aproximadamente R$ 1.200 travada em trâmite administrativo. O firmware que conversaria com o módulo YRM100 já está escrito.
+O **modo RFID UHF** — o único capaz de inventário em massa — está bloqueado por uma compra de aproximadamente R$ 1.200 travada em trâmite administrativo. O firmware que conversaria com o módulo YRM100 já está escrito. Os modos código de barras e NFC funcionam sem esse hardware, então dá para contribuir hoje com qualquer Android — mas eles não substituem o UHF, e o pedido abaixo segue válido e prioritário.
 
-Se o seu órgão, universidade ou empresa já tem um leitor UHF disponível, **você pode destravar esta etapa em uma tarde**. [Abra uma issue](../../issues/new) contando qual módulo você tem e ajudamos a rodar.
+Se o seu órgão, universidade ou empresa já tem um leitor UHF disponível, **você pode destravar o modo UHF em uma tarde**. [Abra uma issue](../../issues/new) contando qual módulo você tem e ajudamos a rodar.
 
 ### 2. 📋 Relatos de campo — inclusive de fracasso
 
@@ -58,7 +58,8 @@ Veja o [roadmap no README](README.md#️-roadmap). Itens de curto prazo não dep
 
 **Android (Kotlin)**
 - Jetpack Compose para a interface; XML tradicional foi removido do projeto.
-- Estrutura por responsabilidade: `ble/`, `model/`, `ui/`.
+- Estrutura por responsabilidade: `domain/`, `scan/`, `ble/`, `ui/`.
+- Interpretação de payload (UHF, NDEF/UID do NFC, texto do código de barras) em **funções puras**, sem API Android, cobertas por teste unitário sem aparelho.
 - Alterações no protocolo BLE **devem ser espelhadas** em `BleConstants.kt` e no firmware, e documentadas na seção de protocolo do README.
 
 ---

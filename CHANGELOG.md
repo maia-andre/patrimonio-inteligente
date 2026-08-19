@@ -1,5 +1,11 @@
 # Changelog
 
+## INC-07 — Documentação: README e CONTRIBUTING (19/08/2026)
+- REQ-14: README atualizado — nova seção "Os três modos de captura" (tabela de perfis + advertência NFC ≠ UHF), duas linhas funcionais no "Estado real", gargalo delimitado ao modo UHF, fecho sem o pré-requisito de R$ 1.200, caminho "Comece sem hardware nenhum", diagrama com as três origens, débito técnico registrando o payload `codigo;descricao` já aceito no app, roadmap e sumário atualizados.
+- REQ-15: CONTRIBUTING delimita o bloqueio de R$ 1.200 ao modo UHF, preservando o pedido de acesso a leitor como prioritário.
+- RNF-06: requisito mínimo corrigido para Android 9 (API 28), em acordo com o `build.gradle.kts`; menção de permissões Bluetooth "Android 12+" preservada por estar correta.
+- Fecha o backlog da spec de modos de captura: 7/7 incrementos concluídos.
+
 ## INC-06 — Modo NFC (reader mode) (19/08/2026)
 - REQ-07: o modo NFC captura etiquetas pela antena do celular em primeiro plano (reader mode), aceitando NfcA, NfcB, NfcF e NfcV.
 - RN-02: o código vem do registro NDEF de texto da etiqueta; sem NDEF ou com texto vazio (CE-05/CE-06), vale o UID em hexadecimal maiúsculo — ex.: `04A224B25C6180`.

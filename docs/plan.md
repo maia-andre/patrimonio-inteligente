@@ -1,7 +1,7 @@
 # Plan: Modos de captura — código de barras, NFC e RFID UHF
 
 Spec: docs/spec.md, versão 1 (10/08/2026, aprovada) | Gerado: 18/08/2026
-Progresso: 6/7 incrementos concluídos
+Progresso: 7/7 incrementos concluídos — backlog encerrado em 19/08/2026
 
 ## Backlog
 
@@ -54,7 +54,7 @@ Entrega verificável: encostar uma etiqueta NFC adiciona o item à lista com o c
 Escopo: `FonteDeLeitura` NFC com `NfcAdapter.enableReaderMode` para NfcA/NfcB/NfcF/NfcV (REQ-07). Extração do código como função pura conforme a precedência da RN-02, cobrindo etiqueta sem NDEF (CE-05) e NDEF sem registro de texto ou com texto vazio (CE-06) por teste unitário. Motivos de indisponibilidade "aparelho sem NFC" (CE-02) e "NFC desligado" (CE-04) distintos entre si.
 
 ### INC-07 — Documentação: README e CONTRIBUTING
-Status: pendente
+Status: concluído
 Itens da spec: REQ-14, REQ-15 | RNF-06
 Depende de: INC-05, INC-06
 Entrega verificável: cada ponto do REQ-14 é conferível linha a linha no README (tabela dos três modos com a advertência NFC ≠ UHF, linhas novas no "Estado real do projeto", gargalo delimitado ao modo UHF, fecho sem o pré-requisito de R$ 1.200, caminho de reprodução sem hardware, diagrama com três origens, débito técnico do protocolo BLE, roadmap e sumário atualizados); o CONTRIBUTING delimita o bloqueio ao modo UHF (REQ-15); a tabela de ambiente declara minSdk 28 em acordo com o `build.gradle.kts` (RNF-06).

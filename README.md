@@ -17,6 +17,7 @@
 
 - [Por que isso importa (e por que não é só nosso)](#-por-que-isso-importa-e-por-que-não-é-só-nosso)
 - [Como funciona](#️-como-funciona)
+- [Os três modos de captura](#-os-três-modos-de-captura)
 - [Estado real do projeto](#-estado-real-do-projeto)
 - [Onde entra a Inteligência Artificial](#-onde-entra-a-inteligência-artificial)
 - [Reproduza no seu município](#-reproduza-no-seu-município)
@@ -64,10 +65,14 @@ Se você trabalha com patrimônio em qualquer prefeitura, autarquia ou órgão p
 
 Etiquetas **RFID UHF passivas** (sem bateria, baratas, duráveis) são fixadas nos bens e vinculadas à placa patrimonial. Um leitor móvel varre o ambiente por rádio — **dezenas de itens por segundo, à distância, sem contato visual** — e envia as leituras via Bluetooth para um aplicativo Android, que reconcilia com o cadastro e aponta o que falta, o que sobra e o que mudou de lugar.
 
+Enquanto o acervo legado ainda não tem etiqueta UHF, o mesmo aplicativo captura pela **câmera** (código de barras da plaqueta) e pela **antena NFC** do próprio celular — as três origens entregam a leitura pela mesma porta de domínio, para a mesma lista.
+
 ```mermaid
 graph LR
     subgraph Campo["🏢 Em campo"]
         TAG["🏷️ Etiquetas RFID UHF<br/>passivas nos bens"]
+        BAR["🏷️ Código de barras<br/>na plaqueta"]
+        NTAG["🏷️ Etiqueta NFC<br/>no bem"]
         LEITOR["📡 Módulo leitor UHF<br/>(YRM100)"]
         TAG -.->|"rádio 865-928 MHz<br/>até ~6 m"| LEITOR
     end
@@ -78,9 +83,15 @@ graph LR
     end
 
     subgraph App["📱 App Android (Kotlin + Compose)"]
+        CAM["📷 Câmera<br/>CameraX + ZXing"]
+        NFC["📶 Antena NFC<br/>reader mode"]
         BLEMGR["BleManager"]
+        VM["ScannerViewModel<br/>porta única FonteDeLeitura"]
         UI["Tela de inventário"]
-        BLEMGR <--> UI
+        CAM --> VM
+        NFC --> VM
+        BLEMGR --> VM
+        VM --> UI
     end
 
     subgraph Backoffice["🧠 Camada de dados e IA (roadmap)"]
@@ -89,6 +100,8 @@ graph LR
         SIST["Sistema de<br/>patrimônio (API)"]
     end
 
+    BAR -->|"visada direta"| CAM
+    NTAG -->|"~4 cm"| NFC
     FIRM <-->|"BLE / GATT"| BLEMGR
     UI -.->|roadmap| RECON
     RECON -.-> SIST
@@ -111,6 +124,22 @@ graph LR
 
 ---
 
+## 📸 Os três modos de captura
+
+O aplicativo captura leitura patrimonial por três caminhos complementares. Dois deles — código de barras e NFC — **não exigem hardware nenhum além do próprio celular**: qualquer servidor com um Android na mão consegue conferir bens hoje. O módulo UHF deixou de ser pré-requisito do projeto para ser pré-requisito de apenas um dos três modos.
+
+| Modo | Faixa / norma | Hardware | Alcance | Itens por leitura |
+|---|---|---|---|---|
+| Código de barras | óptico | câmera do celular | visada direta | 1 |
+| NFC | 13,56 MHz · ISO 14443 / 15693 | antena do celular | ~4 cm | 1 |
+| RFID UHF | 860–960 MHz · EPC Gen2 / ISO 18000-6C | ESP32 + módulo leitor, via BLE | até 6 m | dezenas por segundo |
+
+> ⚠️ **NFC não é RFID UHF e não o substitui.** São faixas e normas distintas, com perfis operacionais incomparáveis — o celular **não lê etiqueta UHF**. Código de barras e NFC atendem à conferência item a item do acervo legado; o UHF é o único caminho para inventário em massa e continua sendo o objetivo final do projeto.
+
+No modo código de barras são aceitos **Code 128, Code 39 e QR Code** — EAN e UPC, de varejo, são ignorados de propósito, para o aplicativo não capturar o código da embalagem em vez do código do bem. No modo NFC, o código vem do registro de texto NDEF da etiqueta ou, na falta dele, do UID em hexadecimal. A permissão de câmera é pedida só ao selecionar o modo código de barras, e o aplicativo permanece instalável em aparelho sem NFC e sem câmera.
+
+---
+
 ## 🔍 Estado real do projeto
 
 **Esta seção existe porque vitrine sem honestidade não serve para ninguém.** Se você está avaliando adotar este projeto, precisa saber exatamente onde ele está — inclusive o que ainda não existe.
@@ -118,9 +147,11 @@ graph LR
 | Componente | Estado | Observação |
 |---|:---:|---|
 | Firmware ESP32 (servidor BLE) | ✅ **Funciona** | Testado em hardware real, ESP32 DevKit V1 |
-| App Android nativo (Kotlin + Compose) | ✅ **Funciona** | Compila e roda em aparelho físico, Android 12+ |
+| App Android nativo (Kotlin + Compose) | ✅ **Funciona** | Compila e roda em aparelho físico, Android 9+ (API 28) |
 | Comunicação bidirecional BLE | ✅ **Funciona** | Validada ponta a ponta, com fragmentação de mensagens longas |
 | Controle de GPIO / feedback físico | ✅ **Funciona** | LED onboard como indicador de varredura ativa |
+| Leitura por código de barras (câmera) | ✅ **Funciona** | CameraX + ZXing: Code 128, Code 39 e QR Code, sem Google Play Services |
+| Leitura por NFC | ✅ **Funciona** | Reader mode NfcA/B/F/V; código via registro NDEF de texto ou UID |
 | Fluxo de leitura patrimonial | 🟡 **Simulado** | O ESP32 devolve um registro patrimonial fictício após 800 ms |
 | Leitura de tag RFID UHF real | ❌ **Não existe** | **Bloqueado: falta adquirir o módulo leitor** |
 | Persistência local (histórico) | ❌ **Não existe** | Planejado com Room |
@@ -135,9 +166,9 @@ Isso significa que **toda a espinha dorsal — captura, transporte, fragmentaç�
 
 > ### 🚧 O gargalo, dito com todas as letras
 >
-> O projeto está travado por uma compra de aproximadamente **R$ 1.200**. Não é um problema técnico — é um trâmite administrativo. Enquanto isso, o firmware que conversaria com o leitor está escrito e esperando.
+> O **modo RFID UHF** — e apenas ele — está travado por uma compra de aproximadamente **R$ 1.200**. Não é um problema técnico — é um trâmite administrativo. Enquanto isso, os modos **código de barras e NFC funcionam hoje, sem hardware nenhum**, e o firmware que conversaria com o leitor está escrito e esperando.
 >
-> **Se o seu órgão já tem um leitor UHF na gaveta, você pode nos ajudar a destravar isto em uma tarde.** Veja [Procuram-se parceiros](#-procuram-se-parceiros).
+> **Se o seu órgão já tem um leitor UHF na gaveta, você pode nos ajudar a destravar o modo UHF em uma tarde.** Veja [Procuram-se parceiros](#-procuram-se-parceiros).
 
 ---
 
@@ -183,7 +214,17 @@ Estão especificadas aqui como convite explícito a colaboradores e como declara
 
 ## 🔧 Reproduza no seu município
 
-### Lista de materiais
+### Comece sem hardware nenhum
+
+A lista de materiais abaixo vale **só para o modo RFID UHF**. Para conhecer o fluxo completo de conferência sem comprar nada:
+
+1. Instale o aplicativo (seção [Aplicativo Android](#aplicativo-android)) em qualquer Android 9+ (API 28).
+2. Selecione o modo **código de barras** e aponte a câmera para um Code 128, Code 39 ou QR Code fictício — vale imprimir ou exibir na tela de outro dispositivo.
+3. Em aparelho com NFC, selecione o modo **NFC** e encoste em uma etiqueta NfcA/B/F/V — o código vem do registro NDEF de texto ou, na falta dele, do UID.
+
+É a mesma lista, com a mesma deduplicação e o mesmo contador do modo UHF — só muda a origem da leitura.
+
+### Lista de materiais (modo RFID UHF)
 
 | Item | Função | Custo estimado |
 |---|---|---|
@@ -191,7 +232,7 @@ Estão especificadas aqui como convite explícito a colaboradores e como declara
 | Módulo leitor RFID UHF **YRM100** | Antena e rádio UHF | ~R$ 600 |
 | Lote de etiquetas UHF para teste | Tags passivas EPC Gen2 | ~R$ 200 |
 | Fonte externa 5V + acessórios | Alimentação do módulo | ~R$ 400 |
-| Smartphone Android 12+ | Executa o app | Já disponível na maioria dos setores |
+| Smartphone Android 9+ (API 28) | Executa o app | Já disponível na maioria dos setores |
 
 > **Sobre o custo do módulo:** o preço varia bastante conforme a origem — importação direta sai consideravelmente mais barata que aquisição por fornecedor nacional dentro de processo formal de compra, onde incidem impostos e intermediação. Adotamos **~R$ 600** como referência de compra institucional. **Orce conforme a sua realidade de aquisição** — a bancada completa de validação fica em torno de **R$ 1.200**.
 
@@ -242,7 +283,7 @@ O app solicitará permissões de Bluetooth na primeira execução (obrigatório 
 | Gradle | 9.4.1 |
 | Kotlin | 2.2.10 (embutido pelo AGP) |
 | Compose BOM | 2026.02.01 |
-| Android mínimo | 12 (API 31) |
+| Android mínimo | 9 (API 28) |
 
 > 💡 **Armadilha do AGP 9.x:** o AGP 9 embute o plugin `org.jetbrains.kotlin.android` internamente. Declará-lo novamente no `build.gradle.kts` quebra o build com `Cannot add extension with name 'kotlin'`. Apenas o `kotlin-compose` precisa ser declarado à parte. Perdemos horas nisso — fica registrado para você não perder.
 
@@ -279,7 +320,7 @@ TX → "tivo encontrado e re"
 TX → "__END__"          ← app remonta e exibe
 ```
 
-> 🔨 **Débito técnico assumido:** os comandos ainda se chamam `LED_ON`/`LED_OFF`, herança da fase de aprendizado do BLE. Devem ser renomeados para `SCAN_START`/`SCAN_STOP`, e a resposta deve virar um payload estruturado (EPC + metadados) em vez de texto corrido. Está mapeado — veja as issues abertas.
+> 🔨 **Débito técnico assumido:** os comandos ainda se chamam `LED_ON`/`LED_OFF`, herança da fase de aprendizado do BLE. Devem ser renomeados para `SCAN_START`/`SCAN_STOP`, e a resposta deve virar um payload estruturado (EPC + metadados) em vez de texto corrido. **O lado do aplicativo já aceita o payload estruturado `codigo;descricao`** — o parser é tolerante aos dois formatos —, restando o firmware passar a emiti-lo. Está mapeado — veja as issues abertas.
 
 ---
 
@@ -302,9 +343,12 @@ graph LR
 <summary><b>Detalhamento das tarefas por horizonte</b></summary>
 
 **Curto prazo — enquanto o hardware não chega**
-- [ ] Enriquecer a simulação com múltiplos ativos e lista de inventário
+- [x] Modos de captura sem hardware: código de barras (CameraX + ZXing) e NFC (reader mode)
+- [x] Camada de domínio com porta única de captura, ViewModel e lista de inventário com deduplicação e contador
+- [x] Payload estruturado `codigo;descricao` aceito no lado do aplicativo (parser tolerante aos dois formatos)
+- [ ] Enriquecer a simulação do firmware com múltiplos ativos
 - [ ] Persistência local com Room (histórico de leituras)
-- [ ] Renomear comandos BLE (`SCAN_START`/`SCAN_STOP`) e estruturar o payload
+- [ ] Renomear comandos BLE (`SCAN_START`/`SCAN_STOP`) e emitir o payload estruturado no firmware
 - [ ] Refatorar a UI de painel de botões para tela de auditoria e inventário
 
 **Médio prazo — após aquisição do YRM100**
@@ -367,6 +411,6 @@ Escolhemos uma licença permissiva deliberadamente: o objetivo é **remover atri
 
 **Se o seu município também mede patrimônio com prancheta e caneta, este repositório é seu.**
 
-*Modernizar o patrimônio começa com R$ 1.200 e uma decisão.*
+*Modernizar o patrimônio começa com um celular Android que o seu setor já tem — e escala com R$ 1.200 e uma decisão.*
 
 </div>
