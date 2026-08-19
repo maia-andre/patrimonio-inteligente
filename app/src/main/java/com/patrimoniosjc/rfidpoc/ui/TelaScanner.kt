@@ -44,7 +44,8 @@ fun TelaScanner(
     estado: EstadoTelaScanner,
     aoAlternarConexao: () -> Unit,
     aoIniciarLeitura: () -> Unit,
-    aoPararLeitura: () -> Unit
+    aoPararLeitura: () -> Unit,
+    aoSelecionarModo: (OrigemLeitura) -> Unit = {}
 ) {
     Column(
         modifier = Modifier
@@ -63,7 +64,14 @@ fun TelaScanner(
             style = MaterialTheme.typography.titleMedium,
             color = if (estado.conectado) Color(0xFF4CAF50) else Color(0xFFF44336)
         )
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(12.dp))
+
+        SeletorDeModos(
+            modos = estado.modos,
+            modoSelecionado = estado.modoSelecionado,
+            aoSelecionarModo = aoSelecionarModo
+        )
+        Spacer(modifier = Modifier.height(12.dp))
 
         Button(
             onClick = aoAlternarConexao,
@@ -163,6 +171,45 @@ fun TelaScanner(
             items(estado.logs) { log ->
                 Text(text = log, style = MaterialTheme.typography.bodySmall)
                 HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+            }
+        }
+    }
+}
+
+/** REQ-03/REQ-11 — seletor com os três modos; indisponível aparece desabilitado com o motivo. */
+@Composable
+private fun SeletorDeModos(
+    modos: List<ModoDaTela>,
+    modoSelecionado: OrigemLeitura,
+    aoSelecionarModo: (OrigemLeitura) -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        modos.forEach { modo ->
+            val selecionado = modo.origem == modoSelecionado
+            Column(modifier = Modifier.weight(1f)) {
+                Button(
+                    onClick = { aoSelecionarModo(modo.origem) },
+                    enabled = modo.disponivel,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (selecionado) Color(0xFF1976D2) else Color(0xFF90A4AE)
+                    )
+                ) {
+                    Text(
+                        text = rotuloDaOrigem(modo.origem),
+                        style = MaterialTheme.typography.labelSmall
+                    )
+                }
+                modo.motivo?.let { motivo ->
+                    Text(
+                        text = motivo,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color(0xFF757575)
+                    )
+                }
             }
         }
     }

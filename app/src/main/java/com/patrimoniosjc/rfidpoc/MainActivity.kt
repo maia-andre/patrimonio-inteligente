@@ -18,6 +18,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import com.patrimoniosjc.rfidpoc.ble.BleManager
+import com.patrimoniosjc.rfidpoc.domain.OrigemLeitura
 import com.patrimoniosjc.rfidpoc.scan.FonteUhfBle
 import com.patrimoniosjc.rfidpoc.ui.ScannerViewModel
 import com.patrimoniosjc.rfidpoc.ui.TelaScanner
@@ -41,7 +42,7 @@ class MainActivity : ComponentActivity() {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T =
                 ScannerViewModel(
-                    fonte = fonteUhf,
+                    fontes = mapOf(OrigemLeitura.RFID_UHF to fonteUhf),
                     conectar = { bleManager?.startScan() },
                     desconectar = { bleManager?.disconnect() }
                 ) as T
@@ -82,7 +83,8 @@ class MainActivity : ComponentActivity() {
                         estado = estado,
                         aoAlternarConexao = viewModel::alternarConexao,
                         aoIniciarLeitura = viewModel::iniciarLeitura,
-                        aoPararLeitura = viewModel::pararLeitura
+                        aoPararLeitura = viewModel::pararLeitura,
+                        aoSelecionarModo = viewModel::selecionarModo
                     )
                 }
             }
@@ -113,6 +115,16 @@ class MainActivity : ComponentActivity() {
         } else {
             viewModel.registrarLog("Permissões OK.")
         }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        viewModel.aoVoltarAoPrimeiroPlano()
+    }
+
+    override fun onStop() {
+        super.onStop()
+        viewModel.aoEntrarEmSegundoPlano()
     }
 
     override fun onDestroy() {

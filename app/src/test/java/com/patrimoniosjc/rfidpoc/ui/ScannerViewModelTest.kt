@@ -15,20 +15,25 @@ import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
 /**
- * REQ-02 — o ScannerViewModel controla a fonte e expõe o estado da tela,
- * verificável com fonte falsa, sem aparelho. Dados fictícios (RNF-03).
+ * REQ-02/REQ-03/REQ-10/REQ-11, RN-05 — o ScannerViewModel controla a fonte
+ * ativa, o seletor de modos e o ciclo de vida, verificável com fontes falsas.
+ * Dados fictícios (RNF-03).
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class ScannerViewModelTest {
 
     private val dispatcher = StandardTestDispatcher()
 
-    private class FonteFalsa : FonteDeLeitura {
+    private class FonteFalsa(
+        private val nome: String = "fonte",
+        private val eventos: MutableList<String>? = null
+    ) : FonteDeLeitura {
         val canal = MutableSharedFlow<LeituraPatrimonial>(extraBufferCapacity = 8)
         var iniciadas = 0
             private set
@@ -37,10 +42,12 @@ class ScannerViewModelTest {
 
         override fun iniciar() {
             iniciadas++
+            eventos?.add("$nome.iniciar")
         }
 
         override fun parar() {
             paradas++
+            eventos?.add("$nome.parar")
         }
 
         override val leituras: Flow<LeituraPatrimonial> = canal
@@ -63,24 +70,35 @@ class ScannerViewModelTest {
         Dispatchers.resetMain()
     }
 
-    private fun novoViewModel() = ScannerViewModel(
-        fonte = fonte,
+    private fun novoViewModel(
+        fontes: Map<OrigemLeitura, FonteDeLeitura> = mapOf(OrigemLeitura.RFID_UHF to fonte)
+    ) = ScannerViewModel(
+        fontes = fontes,
         conectar = { conexoesPedidas++ },
         desconectar = { desconexoesPedidas++ },
         relogio = { 1_755_500_000_000L }
     )
 
+    private fun leituraDe(
+        codigo: String?,
+        bruto: String,
+        origem: OrigemLeitura = OrigemLeitura.RFID_UHF,
+        instante: Long = 1_000L
+    ) = LeituraPatrimonial(
+        codigo = codigo,
+        descricao = null,
+        origem = origem,
+        bruto = bruto,
+        instante = instante
+    )
+
+    // ---- INC-02: estado, conexão e delegação à fonte ----
+
     @Test
     fun `leitura emitida pela fonte aparece no estado da tela`() = runTest(dispatcher) {
         val viewModel = novoViewModel()
         advanceUntilIdle() // garante que o coletor do init já se inscreveu na fonte
-        val leitura = LeituraPatrimonial(
-            codigo = "147258",
-            descricao = "Notebook Positivo",
-            origem = OrigemLeitura.RFID_UHF,
-            bruto = "147258;Notebook Positivo",
-            instante = 1_000L
-        )
+        val leitura = leituraDe("147258", "147258;Notebook Positivo")
 
         fonte.canal.emit(leitura)
         advanceUntilIdle()
@@ -152,19 +170,6 @@ class ScannerViewModelTest {
 
     // ---- INC-03: lista com deduplicação e contador ----
 
-    private fun leituraDe(
-        codigo: String?,
-        bruto: String,
-        origem: OrigemLeitura = OrigemLeitura.RFID_UHF,
-        instante: Long = 1_000L
-    ) = LeituraPatrimonial(
-        codigo = codigo,
-        descricao = null,
-        origem = origem,
-        bruto = bruto,
-        instante = instante
-    )
-
     @Test
     fun `estado inicial tem lista vazia para a tela mostrar o estado vazio`() {
         val viewModel = novoViewModel()
@@ -233,5 +238,134 @@ class ScannerViewModelTest {
         advanceUntilIdle()
         assertEquals(null, viewModel.estado.value.avisoJaConferido)
         assertEquals(2, viewModel.estado.value.leituras.size)
+    }
+
+    // ---- INC-04: seletor de modos e ciclo de vida das fontes ----
+
+    @Test
+    fun `seletor lista os tres modos com motivo legivel quando indisponiveis`() {
+        val viewModel = novoViewModel()
+
+        val modos = viewModel.estado.value.modos
+        assertEquals(3, modos.size)
+
+        val uhf = modos.single { it.origem == OrigemLeitura.RFID_UHF }
+        assertFalse(uhf.disponivel)
+        assertEquals("Scanner BLE não conectado", uhf.motivo)
+
+        val barras = modos.single { it.origem == OrigemLeitura.CODIGO_BARRAS }
+        assertFalse(barras.disponivel)
+        assertTrue(barras.motivo!!.isNotBlank())
+
+        val nfc = modos.single { it.origem == OrigemLeitura.NFC }
+        assertFalse(nfc.disponivel)
+        assertTrue(nfc.motivo!!.isNotBlank())
+    }
+
+    @Test
+    fun `conectar o ble torna o modo uhf disponivel`() {
+        val viewModel = novoViewModel()
+
+        viewModel.atualizarConexao(true)
+
+        val uhf = viewModel.estado.value.modos.single { it.origem == OrigemLeitura.RFID_UHF }
+        assertTrue(uhf.disponivel)
+        assertNull(uhf.motivo)
+    }
+
+    @Test
+    fun `trocar de modo para a fonte anterior antes de iniciar a nova`() = runTest(dispatcher) {
+        val eventos = mutableListOf<String>()
+        val uhf = FonteFalsa("uhf", eventos)
+        val barras = FonteFalsa("barras", eventos)
+        val viewModel = novoViewModel(
+            fontes = mapOf(OrigemLeitura.RFID_UHF to uhf, OrigemLeitura.CODIGO_BARRAS to barras)
+        )
+        advanceUntilIdle()
+
+        viewModel.selecionarModo(OrigemLeitura.CODIGO_BARRAS)
+        advanceUntilIdle()
+
+        assertEquals(listOf("uhf.parar", "barras.iniciar"), eventos)
+        assertEquals(OrigemLeitura.CODIGO_BARRAS, viewModel.estado.value.modoSelecionado)
+    }
+
+    @Test
+    fun `leitura de fonte parada apos a troca e descartada`() = runTest(dispatcher) {
+        val uhf = FonteFalsa("uhf")
+        val barras = FonteFalsa("barras")
+        val viewModel = novoViewModel(
+            fontes = mapOf(OrigemLeitura.RFID_UHF to uhf, OrigemLeitura.CODIGO_BARRAS to barras)
+        )
+        advanceUntilIdle()
+
+        viewModel.selecionarModo(OrigemLeitura.CODIGO_BARRAS)
+        advanceUntilIdle()
+
+        uhf.canal.emit(leituraDe("147258", "147258")) // fonte parada emite tarde demais
+        advanceUntilIdle()
+        assertTrue(viewModel.estado.value.leituras.isEmpty())
+
+        barras.canal.emit(leituraDe("369852", "369852", OrigemLeitura.CODIGO_BARRAS))
+        advanceUntilIdle()
+        assertEquals(1, viewModel.estado.value.leituras.size)
+        assertEquals("369852", viewModel.estado.value.leituras.single().codigo)
+    }
+
+    @Test
+    fun `selecionar modo indisponivel e ignorado`() {
+        val viewModel = novoViewModel() // NFC sem fonte -> indisponível
+
+        viewModel.selecionarModo(OrigemLeitura.NFC)
+
+        assertEquals(OrigemLeitura.RFID_UHF, viewModel.estado.value.modoSelecionado)
+    }
+
+    @Test
+    fun `queda do ble torna o modo uhf indisponivel e preserva a lista`() = runTest(dispatcher) {
+        val viewModel = novoViewModel()
+        advanceUntilIdle()
+        viewModel.atualizarConexao(true)
+
+        fonte.canal.emit(leituraDe("147258", "147258"))
+        advanceUntilIdle()
+        assertEquals(1, viewModel.estado.value.leituras.size)
+
+        viewModel.atualizarConexao(false) // CE-11: conexão cai durante o uso
+
+        val uhf = viewModel.estado.value.modos.single { it.origem == OrigemLeitura.RFID_UHF }
+        assertFalse(uhf.disponivel)
+        assertEquals("Scanner BLE não conectado", uhf.motivo)
+        assertEquals(1, viewModel.estado.value.leituras.size)
+    }
+
+    @Test
+    fun `segundo plano para a captura em andamento e voltar retoma`() = runTest(dispatcher) {
+        val uhf = FonteFalsa("uhf")
+        val barras = FonteFalsa("barras")
+        val viewModel = novoViewModel(
+            fontes = mapOf(OrigemLeitura.RFID_UHF to uhf, OrigemLeitura.CODIGO_BARRAS to barras)
+        )
+        advanceUntilIdle()
+        viewModel.selecionarModo(OrigemLeitura.CODIGO_BARRAS) // inicia a captura
+        advanceUntilIdle()
+        assertEquals(1, barras.iniciadas)
+
+        viewModel.aoEntrarEmSegundoPlano() // CE-13
+        assertEquals(1, barras.paradas)
+
+        viewModel.aoVoltarAoPrimeiroPlano()
+        assertEquals(2, barras.iniciadas)
+    }
+
+    @Test
+    fun `segundo plano sem captura em andamento nao toca a fonte`() {
+        val viewModel = novoViewModel()
+
+        viewModel.aoEntrarEmSegundoPlano()
+        viewModel.aoVoltarAoPrimeiroPlano()
+
+        assertEquals(0, fonte.iniciadas)
+        assertEquals(0, fonte.paradas)
     }
 }

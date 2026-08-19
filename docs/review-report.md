@@ -1,30 +1,31 @@
-# Review report — 18/08/2026 (INC-03)
-Spec: docs/spec.md, versão 1 (10/08/2026) | Incremento: INC-03 — Lista de leituras com deduplicação e contador | Build report: 18/08/2026 (INC-03)
+# Review report — 18/08/2026 (INC-04)
+Spec: docs/spec.md, versão 1 (10/08/2026) | Incremento: INC-04 — Seletor de modos e ciclo de vida das fontes | Build report: 18/08/2026 (INC-04)
 ## VEREDITO: APROVADO
 
 ## Verificação requisito a requisito
 | Item | Status | Evidência / Falha |
 |------|--------|-------------------|
-| REQ-04 | Atendido | `EstadoTelaScanner.leituras` + `TelaScanner` com "Conferidos na sessão: N" e `LinhaDeLeitura` exibindo chave (código; bruto quando código nulo, coerente com RN-01), `rotuloDaOrigem` e horário HH:mm:ss. Dirigido no verify com saída literal. |
-| REQ-05 | Atendido | `AcumuladorDeLeituras.acumular` (puro) não insere chave repetida; ViewModel sinaliza com card de aviso + log. Testes de acumulador (6) e ViewModel; verify mostrou `contador=2 aviso=Item 147258 já conferido`. |
-| RN-01 | Atendido | `LeituraPatrimonial.chave = codigo ?: bruto`; testes cobrem código presente, código nulo (dedup pelo bruto) e origens diferentes com mesma chave (mesmo bem). |
-| RN-06 | Atendido | Inserção no topo (`listOf(nova) + listaAtual`); ordem verificada em teste e no verify (369852 acima de 147258). |
-| RN-07 | Atendido | Estado só em `MutableStateFlow`; grep do auditor sem `Room`/`SharedPreferences`/`File` em `domain/` e `ui/`. |
-| CE-01 | Atendido | Sem linha nova, contador imóvel, sinalização limitada a 1/s por chave (`LimitadorDeSinalizacao`, decide pelo `instante` — determinístico). Limites 999 ms (bloqueia) e 1 000 ms (permite) testados; verify: 4 duplicatas em rajada → 2 sinalizações. |
-| CE-14 | Atendido | `leituras.isEmpty()` → card "Nenhum item conferido ainda..." em vez de lista em branco; estado inicial vazio testado. |
-| Regressão | Limpa | Suíte re-executada pelo auditor com `--rerun-tasks`: 42/42; `MainActivity`, `ble/` e `scan/` sem diff nesta rodada. |
-| Escopo | Limpo | Mudanças = exatamente os arquivos do incremento; a substituição do card "Último Ativo" pela lista é a materialização do REQ-04 (o card era o display pré-lista das leituras), registrada no build-report. |
+| REQ-03 | Atendido | `SeletorDeModos` renderiza os três modos (`OrigemLeitura.entries`); `modoSelecionado` é um único valor, destacado; troca muda a seleção (teste + verify). |
+| REQ-10 | Atendido | `selecionarModo`: cancela coleta → `parar()` na anterior → assina e `iniciar()` na nova. Ordem provada por trilha de eventos com fontes falsas (`["uhf.parar", "barras.iniciar"]`) e no verify com a fonte UHF **real** (`LED_OFF` antes de `barras.iniciar`) — exatamente o item da definição de concluído. |
+| REQ-11 | Atendido | `ModoDaTela` com `disponivel`/`motivo`; motivo "Scanner BLE não conectado" dinâmico com a conexão; UI desabilita o botão e mostra o motivo. Motivo interino "Ainda não disponível nesta versão" para modos sem fonte, previsto no plano (os motivos de câmera/NFC entram nos INC-05/06). |
+| RNF-04 | Atendido | `uses-feature` nfc e camera com `required="false"` no manifesto-fonte (2 ocorrências) **e** no manifesto mesclado do APK (conferido no verify). |
+| RN-05 | Atendido | Uma única `fonteAtiva`; iniciar implica parar a anterior (mesma prova do REQ-10); coleta única por vez (`coleta?.cancel()` antes de reassinar). |
+| CE-10 | Atendido | Teste `leitura de fonte parada apos a troca e descartada` + verify (payload UHF completo pós-troca não entra: `contador=1`). Cancelamento da coleta garante o descarte mesmo se a fonte parada emitir. |
+| CE-11 | Atendido | Teste + verify: desconexão → UHF `disponivel=false` com motivo certo, `leituras` intactas. |
+| CE-13 | Atendido | `onStop`/`onStart` → `aoEntrarEmSegundoPlano`/`aoVoltarAoPrimeiroPlano`; retoma só se havia captura em andamento (2 testes, incluindo o caso negativo). |
+| Regressão | Limpa | Suíte re-executada pelo auditor: 50/50; `ble/`, `domain/` e `scan/` sem diff; comportamentos dos INC-02/03 cobertos pelos testes antigos, todos verdes. |
+| Escopo | Limpo | Mudanças = manifesto (RNF-04), ViewModel/Tela (seletor + ciclo de vida), MainActivity (fiação `onStart`/`onStop` e mapa de fontes), testes. |
 
 ## Qualidade dos testes (TDD)
-- Vermelho comprovado antes do verde (referências não resolvidas a `chave`/`AcumuladorDeLeituras`).
-- Inversão mental: trocar prepend por append derruba os testes de ordem; remover o `ifEmpty`-equivalente da dedup (comparar por objeto em vez de chave) derruba o teste de origens diferentes; alterar o intervalo do limitador derruba os testes de 999/1000 ms; não limpar o aviso derruba `leitura nova limpa o aviso`.
-- Valores-limite da RN/CE cobertos (999 ms, 1 000 ms, chaves independentes); duplicata cross-origem coberta.
-- Itens da definição de concluído deste incremento: "duas leituras com a mesma chave → uma linha, contador 1" e "duas leituras de origens diferentes com códigos distintos → duas linhas com suas origens" — ambos com teste dedicado.
+- Vermelho comprovado (30 erros de compilação por API inexistente) antes do verde.
+- Inversão mental: inverter a ordem parar/iniciar derruba o teste de trilha de eventos; não cancelar a coleta derruba CE-10; recomputar `modos` sem o motivo derruba os testes de disponibilidade; retomar sem `capturaEmAndamento` derruba o caso negativo de CE-13.
+- Casos extremos com teste dedicado cada (CE-10, CE-11, CE-13 + negativo).
+- Interpretação aceita pelo auditor: ao sair do modo UHF, `parar()` envia `LED_OFF` e **mantém** a conexão BLE — a conexão é recurso de sessão (a disponibilidade do REQ-11 e o CE-11 dependem dela); derrubá-la na troca impediria voltar ao modo UHF sem reconectar, contradizendo o seletor. Registrado no build-report.
 
 ## Segurança
-- Nenhum achado novo. Conteúdo do payload BLE aparece na UI via Compose `Text` (sem interpretação de markup — sem XSS); processamento 100% local (RNF-07); dados fictícios (RNF-03/LGPD).
-- Permanece a observação **baixa** do INC-02 (buffer de fragmentos e logs sem limite — comportamento herdado); a lista de leituras é limitada pelo conjunto de chaves únicas do acervo, sem crescimento por repetição.
-- Nenhuma dependência nova nesta rodada.
+- Nenhum achado novo. Sem dependências novas; motivos são strings estáticas; nenhum dado do payload em decisão de disponibilidade.
+- `uses-feature required=false` não amplia superfície de permissão (nenhuma permissão de câmera/NFC pedida ainda — chegam nos INC-05/06 com seus fluxos).
+- Permanece a observação **baixa** herdada (buffers ilimitados do INC-02).
 
 ## Correções necessárias (para o /build)
 Nenhuma.

@@ -1,5 +1,12 @@
 # Changelog
 
+## INC-04 — Seletor de modos e ciclo de vida das fontes (18/08/2026)
+- REQ-03: a tela ganha o seletor com os três modos de captura — código de barras, NFC e RFID UHF — com exatamente um ativo por vez.
+- REQ-10/RN-05: trocar de modo para a fonte anterior antes de iniciar a nova; leitura de fonte parada é descartada (CE-10).
+- REQ-11: modo indisponível aparece desabilitado com o motivo legível; queda do BLE torna o UHF indisponível preservando a lista (CE-11).
+- CE-13: em segundo plano a captura para; ao voltar, o modo selecionado é retomado.
+- RNF-04: NFC e câmera declarados opcionais no manifesto — o app permanece instalável em aparelho sem esses recursos.
+
 ## INC-03 — Lista de leituras com deduplicação e contador (18/08/2026)
 - REQ-04: as leituras acumulam em lista na tela, com contador de itens conferidos na sessão; cada linha mostra o código, a origem e o horário, com a mais recente no topo.
 - REQ-05: item já conferido não gera linha nova — o aplicativo avisa "já conferido", limitado a uma sinalização por segundo por código (CE-01).

@@ -1,7 +1,7 @@
 # Plan: Modos de captura — código de barras, NFC e RFID UHF
 
 Spec: docs/spec.md, versão 1 (10/08/2026, aprovada) | Gerado: 18/08/2026
-Progresso: 3/7 incrementos concluídos
+Progresso: 4/7 incrementos concluídos
 
 ## Backlog
 
@@ -30,7 +30,7 @@ Entrega verificável: leituras UHF acumulam em lista (mais recente no topo) com 
 Escopo: acúmulo em memória no `ScannerViewModel` com chave de deduplicação `codigo ?: bruto` (RN-01), ordem cronológica inversa (RN-06), lista volátil (RN-07), sinalização de duplicata com limitação de frequência (CE-01) e estado vazio (CE-14). Deduplicação e limitação implementadas como lógica pura, testável sem aparelho.
 
 ### INC-04 — Seletor de modos e ciclo de vida das fontes
-Status: pendente
+Status: concluído
 Itens da spec: REQ-03, REQ-10, REQ-11 | RNF-04 | RN-05 | CE-10, CE-11, CE-13
 Depende de: INC-03
 Entrega verificável: a tela exibe o seletor com os três modos (exatamente um ativo); trocar de modo para a fonte anterior antes de iniciar a nova, e leitura de fonte parada é descartada (verificável com fontes falsas em teste); modo indisponível aparece desabilitado com o motivo; queda do BLE torna o modo UHF indisponível preservando a lista; ir a segundo plano para a fonte ativa e voltar a retoma.
