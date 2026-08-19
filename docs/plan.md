@@ -1,7 +1,7 @@
 # Plan: Modos de captura — código de barras, NFC e RFID UHF
 
 Spec: docs/spec.md, versão 1 (10/08/2026, aprovada) | Gerado: 18/08/2026
-Progresso: 1/7 incrementos concluídos
+Progresso: 2/7 incrementos concluídos
 
 ## Backlog
 
@@ -14,7 +14,7 @@ Entrega verificável: `./gradlew test` roda e passa com os testes do parser UHF 
 Escopo: criar `domain/` com `LeituraPatrimonial`, `OrigemLeitura` e `FonteDeLeitura` (REQ-01) e o parser puro do payload UHF conforme RN-03, cobrindo CE-07/CE-08/CE-09 por teste unitário. Estabelece o padrão da RNF-02 (interpretação de payload em funções puras) que os incrementos seguintes seguem. As RNF-01 (português), RNF-03 (só dado fictício) e RNF-07 (processamento só no aparelho) ficam ancoradas aqui e valem para todos os incrementos.
 
 ### INC-02 — ScannerViewModel e fonte UHF sobre o BleManager
-Status: pendente
+Status: concluído
 Itens da spec: REQ-02, REQ-08, REQ-13 | RNF-08
 Depende de: INC-01
 Entrega verificável: o app sobe, conecta ao ESP32 (simulação do firmware) e exibe a última leitura UHF vinda do `ScannerViewModel` — com a `MainActivity` sem parsing, buffer de fragmentos, deduplicação ou controle de fonte, e `model/BleMessage.kt` removido do repositório.

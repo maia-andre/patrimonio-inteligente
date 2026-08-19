@@ -1,25 +1,20 @@
-# Build report — 18/08/2026
+# Build report — 18/08/2026 (INC-02)
 Spec: docs/spec.md, versão 1 (10/08/2026, aprovada)
-Incremento: INC-01 — Camada de domínio e parser UHF
+Incremento: INC-02 — ScannerViewModel e fonte UHF sobre o BleManager
 Rodada: construção
-Testes: 12 passando / 12 total — `sh gradlew test` (unit; instrumentada exige aparelho)
+Testes: 27 passando / 27 total — `sh gradlew test` (unit; instrumentada exige aparelho)
 
 ## Requisitos atendidos
-- **REQ-01** — Atendido — `domain/LeituraPatrimonial.kt`, `domain/OrigemLeitura.kt` e `domain/FonteDeLeitura.kt`, sem nenhum import de `android.*` (verificado por grep); contrato exercitado com fonte falsa em `FonteDeLeituraTest`.
-- **REQ-09** — Atendido — `domain/InterpretadorPayloadUhf.kt`, função pura `interpretarPayloadUhf`, coberta por `InterpretadorPayloadUhfTest` (9 casos).
-- **RNF-01** — Atendido — código, comentários e testes em português.
-- **RNF-02** — Atendido — o parser UHF é função pura, sem dependência de API Android; roda por teste unitário JVM.
-- **RNF-03** — Atendido — todos os dados de teste são fictícios (`147258`, "Notebook Positivo", "Cadeira giratoria cinza").
-- **RNF-07** — Atendido — nenhum código de rede; processamento inteiramente local.
-- **RN-03** — Atendido — separação pelo primeiro `;`, `bruto` sempre preservado; testes cobrem os dois formatos.
+- **REQ-02** — Atendido — `ui/ScannerViewModel.kt` controla a fonte (iniciar/parar/conectar/desconectar) e expõe `EstadoTelaScanner` por `StateFlow`; a `MainActivity.kt` ficou só com fiação (criação de objetos, permissões BLE e `setContent`) — sem parsing, buffer, deduplicação ou controle de fonte. Coberto por `ScannerViewModelTest` (6 testes com fonte falsa).
+- **REQ-08** — Atendido — `scan/FonteUhfBle.kt` embrulha o `BleManager` por lambdas sem alterá-lo em nada (arquivo `ble/BleManager.kt` intocado); preserva `LED_ON`/`LED_OFF` (constantes `COMANDO_INICIAR`/`COMANDO_PARAR`) e a remontagem por `__END__` via `scan/RemontadorDeFragmentos.kt`. Coberto por `FonteUhfBleTest` (5) e `RemontadorDeFragmentosTest` (4).
+- **REQ-13** — Atendido — `model/BleMessage.kt` removido (`git rm`); antes da remoção, grep confirmou zero referências.
+- **RNF-08** — Atendido — UI segue em Compose (`ui/TelaScanner.kt`, tela movida da MainActivity sem mudança visual); estrutura por responsabilidade: `domain/`, `scan/`, `ble/`, `ui/` (diretório `model/` extinto).
 
 ## Casos extremos cobertos
-- **CE-07** — `payload sem separador produz codigo nulo e payload inteiro na descricao`
-- **CE-08** — `payload com descricao vazia produz descricao nula`
-- **CE-09** — `apenas o primeiro separador divide o payload`
-- Adicionais de robustez: payload vazio, payload `";"`, código vazio antes do separador (todos → nulo, coerente com CE-08/DT-02).
+- Nenhum CE da spec pertence a este incremento (CE-10/11/13 são do INC-04). Robustez adicional testada: `__END__` sem fragmentos não emite leitura; `SCANNER_OFF` aciona aviso e não vira leitura; mensagens sucessivas geram leituras independentes com buffer limpo.
 
 ## Perguntas em aberto / pendências
-- Interpretação registrada (não bloqueante): a spec define descrição vazia → nula (CE-08), mas não define código vazio (`";Notebook"`). Por coerência com CE-08 e DT-02, código vazio também vira nulo — a deduplicação então cai para `bruto`, conforme RN-01. Se a intenção for outra, corrigir em rodada de correção.
-- Infra local: criado `local.properties` apontando o Android SDK (arquivo já ignorado pelo `.gitignore`, não entra no repositório).
-- Dependência nova: `org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2` (necessária para o `Flow` do REQ-01; Apache 2.0, sem Play Services).
+- O card "Último Ativo Escaneado" continua exibindo o payload bruto (comportamento idêntico ao anterior); a exibição estruturada com código/origem/horário é o REQ-04 (INC-03).
+- Comportamento herdado preservado: interpretação das leituras acontece via `FonteUhfBle` com `instante` de relógio injetável (`System.currentTimeMillis` em produção), o que viabiliza os testes de dedup do INC-03.
+- Dependências novas: `androidx.lifecycle:lifecycle-viewmodel-ktx:2.10.0` (ViewModel) e `kotlinx-coroutines-test:1.10.2` (só em teste).
+- Durante o TDD, 1 teste do ViewModel falhou por corrida de inscrição no `SharedFlow` (coletor do `init` ainda não inscrito); corrigido no próprio teste com `advanceUntilIdle()` antes do `emit` — registro honesto de que a correção foi no teste, não no código de produção.
