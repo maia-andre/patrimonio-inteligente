@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
+import android.nfc.NfcAdapter
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
@@ -28,7 +29,9 @@ import androidx.lifecycle.ViewModelProvider
 import com.patrimoniosjc.rfidpoc.ble.BleManager
 import com.patrimoniosjc.rfidpoc.domain.OrigemLeitura
 import com.patrimoniosjc.rfidpoc.scan.FonteCodigoBarras
+import com.patrimoniosjc.rfidpoc.scan.FonteNfc
 import com.patrimoniosjc.rfidpoc.scan.FonteUhfBle
+import com.patrimoniosjc.rfidpoc.ui.EstadoNfc
 import com.patrimoniosjc.rfidpoc.ui.ScannerViewModel
 import com.patrimoniosjc.rfidpoc.ui.TelaScanner
 
@@ -48,6 +51,8 @@ class MainActivity : ComponentActivity() {
 
     private val fonteCodigoBarras by lazy { FonteCodigoBarras(this, this) }
 
+    private val fonteNfc by lazy { FonteNfc(this) }
+
     private val viewModel: ScannerViewModel by viewModels {
         object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
@@ -55,7 +60,8 @@ class MainActivity : ComponentActivity() {
                 ScannerViewModel(
                     fontes = mapOf(
                         OrigemLeitura.RFID_UHF to fonteUhf,
-                        OrigemLeitura.CODIGO_BARRAS to fonteCodigoBarras
+                        OrigemLeitura.CODIGO_BARRAS to fonteCodigoBarras,
+                        OrigemLeitura.NFC to fonteNfc
                     ),
                     conectar = { bleManager?.startScan() },
                     desconectar = { bleManager?.disconnect() },
@@ -183,6 +189,15 @@ class MainActivity : ComponentActivity() {
         ) {
             viewModel.atualizarPermissaoCamera(true)
         }
+        // CE-02/CE-04: reavaliado a cada retorno — o usuário pode ligar o NFC nas configurações
+        val adaptadorNfc = NfcAdapter.getDefaultAdapter(this)
+        viewModel.atualizarEstadoNfc(
+            when {
+                adaptadorNfc == null -> EstadoNfc.SEM_HARDWARE
+                !adaptadorNfc.isEnabled -> EstadoNfc.DESLIGADO
+                else -> EstadoNfc.DISPONIVEL
+            }
+        )
         viewModel.aoVoltarAoPrimeiroPlano()
     }
 

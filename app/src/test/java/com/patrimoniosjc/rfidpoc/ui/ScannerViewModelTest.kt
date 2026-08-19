@@ -495,6 +495,111 @@ class ScannerViewModelTest {
         assertTrue(modoBarras.disponivel)
     }
 
+    // ---- INC-06: disponibilidade e captura do modo NFC ----
+
+    @Test
+    fun `nfc com fonte presente comeca como aparelho sem nfc ate o sistema informar`() {
+        val nfc = FonteFalsa("nfc")
+        val viewModel = novoViewModel(
+            fontes = mapOf(OrigemLeitura.RFID_UHF to fonte, OrigemLeitura.NFC to nfc)
+        )
+
+        val modoNfc = viewModel.estado.value.modos.single { it.origem == OrigemLeitura.NFC }
+        assertFalse(modoNfc.disponivel)
+        assertEquals("Aparelho sem NFC", modoNfc.motivo)
+    }
+
+    @Test
+    fun `nfc desligado tem motivo distinto de aparelho sem nfc`() {
+        val nfc = FonteFalsa("nfc")
+        val viewModel = novoViewModel(
+            fontes = mapOf(OrigemLeitura.RFID_UHF to fonte, OrigemLeitura.NFC to nfc)
+        )
+
+        viewModel.atualizarEstadoNfc(EstadoNfc.DESLIGADO) // CE-04
+
+        val modoNfc = viewModel.estado.value.modos.single { it.origem == OrigemLeitura.NFC }
+        assertFalse(modoNfc.disponivel)
+        assertEquals("NFC desligado", modoNfc.motivo)
+        assertTrue(modoNfc.motivo != "Aparelho sem NFC")
+    }
+
+    @Test
+    fun `nfc disponivel permite a troca com parar antes de iniciar`() = runTest(dispatcher) {
+        val eventos = mutableListOf<String>()
+        val uhf = FonteFalsa("uhf", eventos)
+        val nfc = FonteFalsa("nfc", eventos)
+        val viewModel = novoViewModel(
+            fontes = mapOf(OrigemLeitura.RFID_UHF to uhf, OrigemLeitura.NFC to nfc)
+        )
+        advanceUntilIdle()
+
+        viewModel.atualizarEstadoNfc(EstadoNfc.DISPONIVEL)
+        viewModel.selecionarModo(OrigemLeitura.NFC)
+        advanceUntilIdle()
+
+        assertEquals(listOf("uhf.parar", "nfc.iniciar"), eventos)
+        assertEquals(OrigemLeitura.NFC, viewModel.estado.value.modoSelecionado)
+    }
+
+    @Test
+    fun `leitura da fonte nfc entra na lista com a origem nfc`() = runTest(dispatcher) {
+        val nfc = FonteFalsa("nfc")
+        val viewModel = novoViewModel(
+            fontes = mapOf(OrigemLeitura.RFID_UHF to fonte, OrigemLeitura.NFC to nfc)
+        )
+        advanceUntilIdle()
+        viewModel.atualizarEstadoNfc(EstadoNfc.DISPONIVEL)
+        viewModel.selecionarModo(OrigemLeitura.NFC)
+        advanceUntilIdle()
+
+        nfc.canal.emit(leituraDe("04A224B25C6180", "04A224B25C6180", OrigemLeitura.NFC))
+        advanceUntilIdle()
+
+        val leituras = viewModel.estado.value.leituras
+        assertEquals(1, leituras.size)
+        assertEquals(OrigemLeitura.NFC, leituras.single().origem)
+    }
+
+    @Test
+    fun `nfc desligado durante o uso torna o modo indisponivel e preserva a lista`() = runTest(dispatcher) {
+        val nfc = FonteFalsa("nfc")
+        val viewModel = novoViewModel(
+            fontes = mapOf(OrigemLeitura.RFID_UHF to fonte, OrigemLeitura.NFC to nfc)
+        )
+        advanceUntilIdle()
+        viewModel.atualizarEstadoNfc(EstadoNfc.DISPONIVEL)
+        viewModel.selecionarModo(OrigemLeitura.NFC)
+        advanceUntilIdle()
+        nfc.canal.emit(leituraDe("04A224B25C6180", "04A224B25C6180", OrigemLeitura.NFC))
+        advanceUntilIdle()
+
+        viewModel.atualizarEstadoNfc(EstadoNfc.DESLIGADO)
+
+        val modoNfc = viewModel.estado.value.modos.single { it.origem == OrigemLeitura.NFC }
+        assertFalse(modoNfc.disponivel)
+        assertEquals("NFC desligado", modoNfc.motivo)
+        assertEquals(1, viewModel.estado.value.leituras.size)
+    }
+
+    @Test
+    fun `sem hardware nfc os demais modos operam normalmente`() = runTest(dispatcher) {
+        val nfc = FonteFalsa("nfc")
+        val viewModel = novoViewModel(
+            fontes = mapOf(OrigemLeitura.RFID_UHF to fonte, OrigemLeitura.NFC to nfc)
+        )
+        advanceUntilIdle()
+        viewModel.atualizarEstadoNfc(EstadoNfc.SEM_HARDWARE) // CE-02
+        viewModel.atualizarConexao(true)
+
+        val modoUhf = viewModel.estado.value.modos.single { it.origem == OrigemLeitura.RFID_UHF }
+        assertTrue(modoUhf.disponivel)
+
+        fonte.canal.emit(leituraDe("147258", "147258"))
+        advanceUntilIdle()
+        assertEquals(1, viewModel.estado.value.leituras.size)
+    }
+
     @Test
     fun `negar a permissao nao derruba os demais modos`() = runTest(dispatcher) {
         val uhf = FonteFalsa("uhf")

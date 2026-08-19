@@ -14,6 +14,9 @@
     <!-- REQ-12: solicitada em tempo de execução, só ao selecionar o modo código de barras -->
     <uses-permission android:name="android.permission.CAMERA" />
 
+    <!-- REQ-07: leitura de etiqueta NFC em primeiro plano (reader mode) -->
+    <uses-permission android:name="android.permission.NFC" />
+
     <!-- RNF-04: o aplicativo permanece instalável em aparelho sem NFC e sem câmera -->
     <uses-feature android:name="android.hardware.nfc" android:required="false" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />

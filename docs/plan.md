@@ -1,7 +1,7 @@
 # Plan: Modos de captura — código de barras, NFC e RFID UHF
 
 Spec: docs/spec.md, versão 1 (10/08/2026, aprovada) | Gerado: 18/08/2026
-Progresso: 5/7 incrementos concluídos
+Progresso: 6/7 incrementos concluídos
 
 ## Backlog
 
@@ -46,7 +46,7 @@ Entrega verificável: apontar a câmera para um Code 128, Code 39 ou QR fictíci
 Escopo: `FonteDeLeitura` de código de barras com CameraX e `com.google.zxing:core` (DT-01, DT-03, RNF-05 — sem Google Play Services), aceitando só Code 128, Code 39 e QR Code (REQ-06, RN-04). Filtro de simbologia em função pura (RNF-02). Permissão em tempo de execução na seleção do modo (REQ-12), negação tratada (CE-03), quadro ilegível silencioso (CE-12).
 
 ### INC-06 — Modo NFC (reader mode)
-Status: pendente
+Status: concluído
 Itens da spec: REQ-07 | RN-02 | CE-02, CE-04, CE-05, CE-06
 Depende de: INC-04
 Entrega verificável: encostar uma etiqueta NFC adiciona o item à lista com o código vindo do registro NDEF de texto ou, na falta dele, do UID em hexadecimal maiúsculo; aparelho sem NFC e aparelho com NFC desligado mostram o modo desabilitado com motivos distintos.

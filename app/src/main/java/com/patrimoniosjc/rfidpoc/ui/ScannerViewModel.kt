@@ -17,6 +17,9 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+/** Estado do NFC no aparelho, reportado pela Activity (CE-02/CE-04). */
+enum class EstadoNfc { SEM_HARDWARE, DESLIGADO, DISPONIVEL }
+
 /**
  * Um modo no seletor: disponível, ou desabilitado com o motivo legível (REQ-11).
  * [podeReabrirPermissao] marca o caminho para pedir a permissão de novo (CE-03).
@@ -56,6 +59,15 @@ class ScannerViewModel(
 
     private enum class PermissaoCamera { NAO_SOLICITADA, CONCEDIDA, NEGADA }
 
+    // Estados consultados por montarModos: precisam existir antes do _estado inicial
+
+    // REQ-12: o pedido de permissão nasce da seleção do modo; a troca fica pendente até a resposta
+    private var permissaoCamera = PermissaoCamera.NAO_SOLICITADA
+    private var trocaPendentePorPermissao = false
+
+    // CE-02/CE-04: parte do princípio conservador — sem hardware — até a Activity reportar
+    private var estadoNfc = EstadoNfc.SEM_HARDWARE
+
     private val _estado = MutableStateFlow(
         EstadoTelaScanner(modos = montarModos(conectado = false))
     )
@@ -68,10 +80,6 @@ class ScannerViewModel(
 
     // CE-13: só retoma ao voltar do segundo plano se a captura estava em andamento
     private var capturaEmAndamento = false
-
-    // REQ-12: o pedido de permissão nasce da seleção do modo; a troca fica pendente até a resposta
-    private var permissaoCamera = PermissaoCamera.NAO_SOLICITADA
-    private var trocaPendentePorPermissao = false
 
     init {
         coleta = fonteAtiva?.let { assinar(it) }
@@ -89,6 +97,10 @@ class ScannerViewModel(
                 origem == OrigemLeitura.RFID_UHF && !conectado -> "Scanner BLE não conectado"
                 origem == OrigemLeitura.CODIGO_BARRAS &&
                     permissaoCamera == PermissaoCamera.NEGADA -> "Permissão de câmera negada"
+                origem == OrigemLeitura.NFC &&
+                    estadoNfc == EstadoNfc.SEM_HARDWARE -> "Aparelho sem NFC"
+                origem == OrigemLeitura.NFC &&
+                    estadoNfc == EstadoNfc.DESLIGADO -> "NFC desligado"
                 else -> null
             }
             ModoDaTela(
@@ -136,6 +148,13 @@ class ScannerViewModel(
     fun solicitarPermissaoCamera() {
         trocaPendentePorPermissao = true
         pedirPermissaoCamera()
+    }
+
+    /** CE-02/CE-04 — a Activity reporta o estado do NFC; o motivo distingue os dois casos. */
+    fun atualizarEstadoNfc(estado: EstadoNfc) {
+        if (estado == estadoNfc) return
+        estadoNfc = estado
+        _estado.update { it.copy(modos = montarModos(it.conectado)) }
     }
 
     /** Resposta do sistema ao pedido de permissão de câmera (REQ-12, CE-03). */

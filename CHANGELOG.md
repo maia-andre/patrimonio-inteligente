@@ -1,5 +1,11 @@
 # Changelog
 
+## INC-06 — Modo NFC (reader mode) (19/08/2026)
+- REQ-07: o modo NFC captura etiquetas pela antena do celular em primeiro plano (reader mode), aceitando NfcA, NfcB, NfcF e NfcV.
+- RN-02: o código vem do registro NDEF de texto da etiqueta; sem NDEF ou com texto vazio (CE-05/CE-06), vale o UID em hexadecimal maiúsculo — ex.: `04A224B25C6180`.
+- CE-02/CE-04: aparelho sem NFC e NFC desligado mostram o modo desabilitado com motivos distintos ("Aparelho sem NFC" ≠ "NFC desligado"); ligar o NFC nas configurações e voltar reabilita o modo.
+- Deduplicação entre origens (RN-01): a mesma chave lida por NFC e por código de barras continua sendo um só item na lista.
+
 ## INC-05 — Modo código de barras (CameraX + ZXing) (19/08/2026)
 - REQ-06: o modo código de barras captura pela câmera do celular — CameraX com decodificação ZXing pura (sem Google Play Services, RNF-05), com prévia na tela e leitura de códigos 1D em qualquer orientação.
 - RN-04: só Code 128, Code 39 e QR Code são aceitos; EAN e UPC de varejo são ignorados, para não capturar o código da embalagem no lugar do código do bem.
