@@ -1,5 +1,12 @@
 # Changelog
 
+## INC-05 — Modo código de barras (CameraX + ZXing) (19/08/2026)
+- REQ-06: o modo código de barras captura pela câmera do celular — CameraX com decodificação ZXing pura (sem Google Play Services, RNF-05), com prévia na tela e leitura de códigos 1D em qualquer orientação.
+- RN-04: só Code 128, Code 39 e QR Code são aceitos; EAN e UPC de varejo são ignorados, para não capturar o código da embalagem no lugar do código do bem.
+- REQ-12: a permissão de câmera é pedida só quando o usuário seleciona o modo — nunca na abertura do aplicativo.
+- CE-03: permissão negada desabilita o modo com o motivo e o botão "Permitir câmera" para pedir de novo (negativa permanente leva às configurações do aplicativo); negar não trava nada.
+- CE-12: quadro ilegível ou fora de foco é silêncio — a câmera segue tentando, sem mensagens de erro.
+
 ## INC-04 — Seletor de modos e ciclo de vida das fontes (18/08/2026)
 - REQ-03: a tela ganha o seletor com os três modos de captura — código de barras, NFC e RFID UHF — com exatamente um ativo por vez.
 - REQ-10/RN-05: trocar de modo para a fonte anterior antes de iniciar a nova; leitura de fonte parada é descartada (CE-10).

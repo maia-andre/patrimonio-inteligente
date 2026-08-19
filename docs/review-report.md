@@ -1,31 +1,49 @@
-# Review report — 18/08/2026 (INC-04)
-Spec: docs/spec.md, versão 1 (10/08/2026) | Incremento: INC-04 — Seletor de modos e ciclo de vida das fontes | Build report: 18/08/2026 (INC-04)
+# Review report — 19/08/2026
+Spec: docs/spec.md, versão 1 (10/08/2026, aprovada) | Incremento: INC-05 — Modo código de barras (CameraX + ZXing) | Build report: 19/08/2026
+
 ## VEREDITO: APROVADO
 
+Suíte rodada pelo auditor a partir de `clean`: **70/70 passando, 0 falhas** (`sh gradlew clean testDebugUnitTest`). Verify-report de 19/08 sem FALHAs em aberto.
+
 ## Verificação requisito a requisito
+
 | Item | Status | Evidência / Falha |
 |------|--------|-------------------|
-| REQ-03 | Atendido | `SeletorDeModos` renderiza os três modos (`OrigemLeitura.entries`); `modoSelecionado` é um único valor, destacado; troca muda a seleção (teste + verify). |
-| REQ-10 | Atendido | `selecionarModo`: cancela coleta → `parar()` na anterior → assina e `iniciar()` na nova. Ordem provada por trilha de eventos com fontes falsas (`["uhf.parar", "barras.iniciar"]`) e no verify com a fonte UHF **real** (`LED_OFF` antes de `barras.iniciar`) — exatamente o item da definição de concluído. |
-| REQ-11 | Atendido | `ModoDaTela` com `disponivel`/`motivo`; motivo "Scanner BLE não conectado" dinâmico com a conexão; UI desabilita o botão e mostra o motivo. Motivo interino "Ainda não disponível nesta versão" para modos sem fonte, previsto no plano (os motivos de câmera/NFC entram nos INC-05/06). |
-| RNF-04 | Atendido | `uses-feature` nfc e camera com `required="false"` no manifesto-fonte (2 ocorrências) **e** no manifesto mesclado do APK (conferido no verify). |
-| RN-05 | Atendido | Uma única `fonteAtiva`; iniciar implica parar a anterior (mesma prova do REQ-10); coleta única por vez (`coleta?.cancel()` antes de reassinar). |
-| CE-10 | Atendido | Teste `leitura de fonte parada apos a troca e descartada` + verify (payload UHF completo pós-troca não entra: `contador=1`). Cancelamento da coleta garante o descarte mesmo se a fonte parada emitir. |
-| CE-11 | Atendido | Teste + verify: desconexão → UHF `disponivel=false` com motivo certo, `leituras` intactas. |
-| CE-13 | Atendido | `onStop`/`onStart` → `aoEntrarEmSegundoPlano`/`aoVoltarAoPrimeiroPlano`; retoma só se havia captura em andamento (2 testes, incluindo o caso negativo). |
-| Regressão | Limpa | Suíte re-executada pelo auditor: 50/50; `ble/`, `domain/` e `scan/` sem diff; comportamentos dos INC-02/03 cobertos pelos testes antigos, todos verdes. |
-| Escopo | Limpo | Mudanças = manifesto (RNF-04), ViewModel/Tela (seletor + ciclo de vida), MainActivity (fiação `onStart`/`onStop` e mapa de fontes), testes. |
+| REQ-06 | Atendido | `scan/FonteCodigoBarras.kt` (CameraX `ImageAnalysis` → `analisar` → canal) + `scan/DecodificadorZxing.kt:27-58` (MultiFormatReader restrito por hints); decodificação das 3 simbologias provada em `DecodificadorZxingTest` e dirigida no verify com imagens renderizadas, inclusive 1D rotacionado 90°. |
+| REQ-12 | Atendido | `ScannerViewModel.kt:111-114` — o pedido nasce em `selecionarModo`, nunca na abertura (o `checkPermissions` do `onCreate` só pede BLE; o `onStart` faz checagem passiva que **só** reporta concessão, `MainActivity.kt`). Testes: "selecionar codigo de barras sem permissao pede a permissao e nao inicia a fonte", "permissao concedida completa a troca parando a fonte anterior antes". |
+| RNF-05 | Atendido | Dependências novas: `com.google.zxing:core:3.5.4` + `androidx.camera:*:1.6.1` (`app/build.gradle.kts`); `debugRuntimeClasspath` com **0** ocorrências de `gms`/`play-services` (verificado no verify e conferido pelo auditor no build.gradle — nenhuma dependência Google adicionada além de androidx). |
+| RN-04 | Atendido | Dupla barreira: hints `POSSIBLE_FORMATS` + filtro puro `simbologiaAceita` (`DecodificadorZxing.kt:12-19,53`). Testes provam EAN-13 e UPC-A codificados e **não** decodificados, e o filtro rejeitando EAN-8/UPC-E/DataMatrix/ITF. |
+| CE-03 | Atendido | Negativa → `montarModos` marca indisponível com motivo "Permissão de câmera negada" e `podeReabrirPermissao=true` (`ScannerViewModel.kt:87-100`); TelaScanner renderiza o botão "Permitir câmera" (caminho de reabertura); negativa permanente desvia para as configurações do app (`MainActivity.pedirPermissaoCamera`). Testes: negativa não inicia fonte, mantém modo anterior, não derruba os demais modos. |
+| CE-12 | Atendido | `ReaderException` engolida e retorno nulo (`DecodificadorZxing.kt:54-56`); quadro sem leitura é silêncio na fonte (`FonteCodigoBarras.analisar`). Testes com ruído, quadro uniforme e código cortado ao meio. |
+
+### Transversais e regressão
+
+| Item | Status | Evidência |
+|------|--------|-----------|
+| RNF-01/RNF-03 | Atendido | Código, comentários e testes novos em português; só dados fictícios (PATR-*, 147258, EAN/UPC inventados com dígito verificador calculado). |
+| RNF-02 | Atendido | `DecodificadorZxing`, `rotacionar90`, `simbologiaAceita`, `interpretarCodigoBarras` — puros, sem `android.*`, testados na JVM. |
+| RNF-04 | Atendido | Manifesto mesclado mantém `nfc`/`camera` com `required="false"`; rodada só acrescentou `uses-permission CAMERA`. |
+| RNF-07 | Atendido | Nenhuma chamada de rede no código novo. |
+| RNF-08 | Atendido | Novos arquivos seguem a estrutura: `domain/InterpretadorCodigoBarras.kt`, `scan/DecodificadorZxing.kt`, `scan/FonteCodigoBarras.kt`; UI em Compose (prévia via `AndroidView`+`PreviewView` programático, coerente com DT-01). |
+| Regressão INC-01..04 | Limpa | 70/70 do zero; os 3 testes do INC-04 que trocavam para código de barras ganharam a pré-condição `atualizarPermissaoCamera(true)` — adaptação legítima exigida pelo REQ-12, com a intenção original (ordem parar→iniciar, descarte de fonte parada, segundo plano) preservada e verde. |
+| Escopo | Limpo | Prévia da câmera e desvio às configurações são meios necessários de REQ-06/CE-03, não funcionalidade nova. Nada do "Fora de escopo" foi tocado (sem persistência, sem NFC, sem firmware). |
 
 ## Qualidade dos testes (TDD)
-- Vermelho comprovado (30 erros de compilação por API inexistente) antes do verde.
-- Inversão mental: inverter a ordem parar/iniciar derruba o teste de trilha de eventos; não cancelar a coleta derruba CE-10; recomputar `modos` sem o motivo derruba os testes de disponibilidade; retomar sem `capturaEmAndamento` derruba o caso negativo de CE-13.
-- Casos extremos com teste dedicado cada (CE-10, CE-11, CE-13 + negativo).
-- Interpretação aceita pelo auditor: ao sair do modo UHF, `parar()` envia `LED_OFF` e **mantém** a conexão BLE — a conexão é recurso de sessão (a disponibilidade do REQ-11 e o CE-11 dependem dela); derrubá-la na troca impediria voltar ao modo UHF sem reconectar, contradizendo o seletor. Registrado no build-report.
+
+- Inversão mental: cada comportamento novo tem teste que ficaria vermelho — filtro deixando EAN passar, troca imediata sem permissão, pendência não completada na concessão, motivo ausente na negativa, rotação removida. Vermelho→verde registrado na rodada (compilação falhou com as referências ausentes antes da implementação).
+- CE cobertos além do caminho feliz: ruído, quadro uniforme, código parcial (CE-12); negativa, reabertura, concessão tardia, negativa sem derrubar os demais modos (CE-03).
+- Sem testes vazios/triviais; os testes exercitam o comportamento, não mocks.
+- Lacuna consciente e aceitável: `FonteCodigoBarras` (cola CameraX) não tem teste unitário — mesmo padrão do `BleManager`; sua lógica decodificável é 100% pura e testada, e o contrato iniciar/parar foi dirigido no verify.
 
 ## Segurança
-- Nenhum achado novo. Sem dependências novas; motivos são strings estáticas; nenhum dado do payload em decisão de disponibilidade.
-- `uses-feature required=false` não amplia superfície de permissão (nenhuma permissão de câmera/NFC pedida ainda — chegam nos INC-05/06 com seus fluxos).
-- Permanece a observação **baixa** herdada (buffers ilimitados do INC-02).
+
+- **Entradas**: o texto decodificado vem de etiquetas arbitrárias e vai para `Text` do Compose (sem interpretação de markup) e para log local — sem injeção. Nenhuma persistência nem rede (RNF-07). Severidade: nenhuma.
+- **Permissões**: CAMERA pedida no uso, mínimo necessário; recursos opcionais no manifesto preservam instalabilidade (RNF-04).
+- **Segredos**: nenhum. **LGPD**: só dados fictícios.
+- **Dependências**: ZXing core 3.5.4 e CameraX 1.6.1 são as últimas estáveis; sem vulnerabilidade conhecida aplicável (ZXing core puro, sem superfície de rede).
 
 ## Correções necessárias (para o /build)
+
 Nenhuma.
+
+**Próximo passo**: `/ship` para fechar o INC-05.

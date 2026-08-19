@@ -11,6 +11,9 @@
     <uses-permission android:name="android.permission.BLUETOOTH_SCAN" android:usesPermissionFlags="neverForLocation" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
 
+    <!-- REQ-12: solicitada em tempo de execução, só ao selecionar o modo código de barras -->
+    <uses-permission android:name="android.permission.CAMERA" />
+
     <!-- RNF-04: o aplicativo permanece instalável em aparelho sem NFC e sem câmera -->
     <uses-feature android:name="android.hardware.nfc" android:required="false" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />

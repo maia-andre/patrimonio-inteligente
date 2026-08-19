@@ -17,11 +17,15 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-/** Um modo no seletor: disponível, ou desabilitado com o motivo legível (REQ-11). */
+/**
+ * Um modo no seletor: disponível, ou desabilitado com o motivo legível (REQ-11).
+ * [podeReabrirPermissao] marca o caminho para pedir a permissão de novo (CE-03).
+ */
 data class ModoDaTela(
     val origem: OrigemLeitura,
     val disponivel: Boolean,
-    val motivo: String?
+    val motivo: String?,
+    val podeReabrirPermissao: Boolean = false
 )
 
 /** Estado imutável da tela do scanner. A lista vive só em memória (RN-07). */
@@ -46,8 +50,11 @@ class ScannerViewModel(
     private val fontes: Map<OrigemLeitura, FonteDeLeitura>,
     private val conectar: () -> Unit,
     private val desconectar: () -> Unit,
+    private val pedirPermissaoCamera: () -> Unit = {},
     private val relogio: () -> Long = System::currentTimeMillis
 ) : ViewModel() {
+
+    private enum class PermissaoCamera { NAO_SOLICITADA, CONCEDIDA, NEGADA }
 
     private val _estado = MutableStateFlow(
         EstadoTelaScanner(modos = montarModos(conectado = false))
@@ -62,6 +69,10 @@ class ScannerViewModel(
     // CE-13: só retoma ao voltar do segundo plano se a captura estava em andamento
     private var capturaEmAndamento = false
 
+    // REQ-12: o pedido de permissão nasce da seleção do modo; a troca fica pendente até a resposta
+    private var permissaoCamera = PermissaoCamera.NAO_SOLICITADA
+    private var trocaPendentePorPermissao = false
+
     init {
         coleta = fonteAtiva?.let { assinar(it) }
     }
@@ -70,15 +81,23 @@ class ScannerViewModel(
         fonte.leituras.collect { leitura -> acumular(leitura) }
     }
 
-    /** REQ-11 — disponibilidade com motivo legível. Os motivos específicos de câmera e NFC chegam nos INC-05/06. */
+    /** REQ-11 — disponibilidade com motivo legível. O motivo específico de NFC chega no INC-06. */
     private fun montarModos(conectado: Boolean): List<ModoDaTela> =
         OrigemLeitura.entries.map { origem ->
             val motivo = when {
                 fontes[origem] == null -> "Ainda não disponível nesta versão"
                 origem == OrigemLeitura.RFID_UHF && !conectado -> "Scanner BLE não conectado"
+                origem == OrigemLeitura.CODIGO_BARRAS &&
+                    permissaoCamera == PermissaoCamera.NEGADA -> "Permissão de câmera negada"
                 else -> null
             }
-            ModoDaTela(origem = origem, disponivel = motivo == null, motivo = motivo)
+            ModoDaTela(
+                origem = origem,
+                disponivel = motivo == null,
+                motivo = motivo,
+                podeReabrirPermissao = origem == OrigemLeitura.CODIGO_BARRAS &&
+                    permissaoCamera == PermissaoCamera.NEGADA
+            )
         }
 
     /** REQ-03/REQ-10/RN-05 — troca de modo: para a fonte anterior antes de iniciar a nova. */
@@ -88,11 +107,22 @@ class ScannerViewModel(
         val modo = estadoAtual.modos.firstOrNull { it.origem == origem } ?: return
         if (!modo.disponivel) return
 
+        // REQ-12: a permissão de câmera é pedida na seleção do modo, e a troca espera a resposta
+        if (origem == OrigemLeitura.CODIGO_BARRAS && permissaoCamera != PermissaoCamera.CONCEDIDA) {
+            solicitarPermissaoCamera()
+            return
+        }
+
+        trocarPara(origem)
+    }
+
+    private fun trocarPara(origem: OrigemLeitura) {
+        val novaFonte = fontes[origem] ?: return
+
         // CE-10: cancelar a coleta descarta leituras que a fonte parada emitir depois
         coleta?.cancel()
         fonteAtiva?.parar()
 
-        val novaFonte = fontes.getValue(origem)
         fonteAtiva = novaFonte
         coleta = assinar(novaFonte)
         novaFonte.iniciar()
@@ -100,6 +130,26 @@ class ScannerViewModel(
 
         _estado.update { it.copy(modoSelecionado = origem) }
         registrarLog("Modo ${rotuloDaOrigem(origem)} ativado")
+    }
+
+    /** REQ-12/CE-03 — pede a permissão de câmera; serve também de caminho para reabrir após negativa. */
+    fun solicitarPermissaoCamera() {
+        trocaPendentePorPermissao = true
+        pedirPermissaoCamera()
+    }
+
+    /** Resposta do sistema ao pedido de permissão de câmera (REQ-12, CE-03). */
+    fun atualizarPermissaoCamera(concedida: Boolean) {
+        permissaoCamera = if (concedida) PermissaoCamera.CONCEDIDA else PermissaoCamera.NEGADA
+        _estado.update { it.copy(modos = montarModos(it.conectado)) }
+
+        val trocaPendente = trocaPendentePorPermissao
+        trocaPendentePorPermissao = false
+        if (concedida && trocaPendente) {
+            trocarPara(OrigemLeitura.CODIGO_BARRAS)
+        } else if (!concedida) {
+            registrarLog("Permissão de câmera negada")
+        }
     }
 
     fun alternarConexao() {

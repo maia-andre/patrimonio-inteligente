@@ -1,7 +1,7 @@
 # Plan: Modos de captura — código de barras, NFC e RFID UHF
 
 Spec: docs/spec.md, versão 1 (10/08/2026, aprovada) | Gerado: 18/08/2026
-Progresso: 4/7 incrementos concluídos
+Progresso: 5/7 incrementos concluídos
 
 ## Backlog
 
@@ -38,7 +38,7 @@ Entrega verificável: a tela exibe o seletor com os três modos (exatamente um a
 Escopo: seletor dos três modos (REQ-03), orquestração parar-antes-de-iniciar no ViewModel (REQ-10, RN-05, CE-10, CE-13) e a mecânica de disponibilidade com motivo legível (REQ-11), incluindo o caso UHF "scanner BLE não conectado" e a queda de conexão em uso (CE-11). Manifesto declara NFC e câmera com `android:required="false"` (RNF-04). Os modos código de barras e NFC aparecem no seletor, mas seguem indisponíveis até seus incrementos — os motivos específicos de câmera e NFC completam-se em INC-05 e INC-06.
 
 ### INC-05 — Modo código de barras (CameraX + ZXing)
-Status: pendente
+Status: concluído
 Itens da spec: REQ-06, REQ-12 | RNF-05 | RN-04 | CE-03, CE-12
 Depende de: INC-04
 Entrega verificável: apontar a câmera para um Code 128, Code 39 ou QR fictício adiciona o item à lista; um EAN-13 de varejo é ignorado; a permissão de câmera é pedida só ao selecionar o modo, e negá-la deixa o modo desabilitado com motivo e caminho para pedir de novo, sem travar o app.

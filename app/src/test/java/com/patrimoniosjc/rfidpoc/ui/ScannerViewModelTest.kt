@@ -56,6 +56,7 @@ class ScannerViewModelTest {
     private lateinit var fonte: FonteFalsa
     private var conexoesPedidas = 0
     private var desconexoesPedidas = 0
+    private var pedidosDePermissaoCamera = 0
 
     @Before
     fun preparar() {
@@ -63,6 +64,7 @@ class ScannerViewModelTest {
         fonte = FonteFalsa()
         conexoesPedidas = 0
         desconexoesPedidas = 0
+        pedidosDePermissaoCamera = 0
     }
 
     @After
@@ -76,6 +78,7 @@ class ScannerViewModelTest {
         fontes = fontes,
         conectar = { conexoesPedidas++ },
         desconectar = { desconexoesPedidas++ },
+        pedirPermissaoCamera = { pedidosDePermissaoCamera++ },
         relogio = { 1_755_500_000_000L }
     )
 
@@ -281,6 +284,7 @@ class ScannerViewModelTest {
         val viewModel = novoViewModel(
             fontes = mapOf(OrigemLeitura.RFID_UHF to uhf, OrigemLeitura.CODIGO_BARRAS to barras)
         )
+        viewModel.atualizarPermissaoCamera(true) // REQ-12: câmera já autorizada
         advanceUntilIdle()
 
         viewModel.selecionarModo(OrigemLeitura.CODIGO_BARRAS)
@@ -297,6 +301,7 @@ class ScannerViewModelTest {
         val viewModel = novoViewModel(
             fontes = mapOf(OrigemLeitura.RFID_UHF to uhf, OrigemLeitura.CODIGO_BARRAS to barras)
         )
+        viewModel.atualizarPermissaoCamera(true) // REQ-12: câmera já autorizada
         advanceUntilIdle()
 
         viewModel.selecionarModo(OrigemLeitura.CODIGO_BARRAS)
@@ -346,6 +351,7 @@ class ScannerViewModelTest {
         val viewModel = novoViewModel(
             fontes = mapOf(OrigemLeitura.RFID_UHF to uhf, OrigemLeitura.CODIGO_BARRAS to barras)
         )
+        viewModel.atualizarPermissaoCamera(true) // REQ-12: câmera já autorizada
         advanceUntilIdle()
         viewModel.selecionarModo(OrigemLeitura.CODIGO_BARRAS) // inicia a captura
         advanceUntilIdle()
@@ -367,5 +373,145 @@ class ScannerViewModelTest {
 
         assertEquals(0, fonte.iniciadas)
         assertEquals(0, fonte.paradas)
+    }
+
+    // ---- INC-05: permissão de câmera e o modo código de barras ----
+
+    @Test
+    fun `selecionar codigo de barras sem permissao pede a permissao e nao inicia a fonte`() = runTest(dispatcher) {
+        val uhf = FonteFalsa("uhf")
+        val barras = FonteFalsa("barras")
+        val viewModel = novoViewModel(
+            fontes = mapOf(OrigemLeitura.RFID_UHF to uhf, OrigemLeitura.CODIGO_BARRAS to barras)
+        )
+        advanceUntilIdle()
+
+        viewModel.selecionarModo(OrigemLeitura.CODIGO_BARRAS) // REQ-12: o pedido nasce da seleção
+
+        assertEquals(1, pedidosDePermissaoCamera)
+        assertEquals(0, barras.iniciadas)
+        assertEquals(0, uhf.paradas)
+        assertEquals(OrigemLeitura.RFID_UHF, viewModel.estado.value.modoSelecionado)
+    }
+
+    @Test
+    fun `permissao concedida completa a troca parando a fonte anterior antes`() = runTest(dispatcher) {
+        val eventos = mutableListOf<String>()
+        val uhf = FonteFalsa("uhf", eventos)
+        val barras = FonteFalsa("barras", eventos)
+        val viewModel = novoViewModel(
+            fontes = mapOf(OrigemLeitura.RFID_UHF to uhf, OrigemLeitura.CODIGO_BARRAS to barras)
+        )
+        advanceUntilIdle()
+        viewModel.selecionarModo(OrigemLeitura.CODIGO_BARRAS)
+
+        viewModel.atualizarPermissaoCamera(true)
+        advanceUntilIdle()
+
+        assertEquals(listOf("uhf.parar", "barras.iniciar"), eventos)
+        assertEquals(OrigemLeitura.CODIGO_BARRAS, viewModel.estado.value.modoSelecionado)
+    }
+
+    @Test
+    fun `permissao negada desabilita o modo com motivo e mantem o modo anterior`() = runTest(dispatcher) {
+        val uhf = FonteFalsa("uhf")
+        val barras = FonteFalsa("barras")
+        val viewModel = novoViewModel(
+            fontes = mapOf(OrigemLeitura.RFID_UHF to uhf, OrigemLeitura.CODIGO_BARRAS to barras)
+        )
+        advanceUntilIdle()
+        viewModel.selecionarModo(OrigemLeitura.CODIGO_BARRAS)
+
+        viewModel.atualizarPermissaoCamera(false) // CE-03
+
+        val modoBarras = viewModel.estado.value.modos.single { it.origem == OrigemLeitura.CODIGO_BARRAS }
+        assertFalse(modoBarras.disponivel)
+        assertEquals("Permissão de câmera negada", modoBarras.motivo)
+        assertEquals(0, barras.iniciadas)
+        assertEquals(OrigemLeitura.RFID_UHF, viewModel.estado.value.modoSelecionado)
+    }
+
+    @Test
+    fun `apos a negativa ha caminho para reabrir a solicitacao`() = runTest(dispatcher) {
+        val uhf = FonteFalsa("uhf")
+        val barras = FonteFalsa("barras")
+        val viewModel = novoViewModel(
+            fontes = mapOf(OrigemLeitura.RFID_UHF to uhf, OrigemLeitura.CODIGO_BARRAS to barras)
+        )
+        advanceUntilIdle()
+        viewModel.selecionarModo(OrigemLeitura.CODIGO_BARRAS)
+        viewModel.atualizarPermissaoCamera(false)
+
+        // CE-03: o modo negado expõe o caminho para pedir de novo
+        val modoBarras = viewModel.estado.value.modos.single { it.origem == OrigemLeitura.CODIGO_BARRAS }
+        assertTrue(modoBarras.podeReabrirPermissao)
+
+        viewModel.solicitarPermissaoCamera()
+        assertEquals(2, pedidosDePermissaoCamera)
+
+        viewModel.atualizarPermissaoCamera(true)
+        advanceUntilIdle()
+
+        val depois = viewModel.estado.value.modos.single { it.origem == OrigemLeitura.CODIGO_BARRAS }
+        assertTrue(depois.disponivel)
+        assertNull(depois.motivo)
+        assertEquals(OrigemLeitura.CODIGO_BARRAS, viewModel.estado.value.modoSelecionado)
+        assertEquals(1, barras.iniciadas)
+    }
+
+    @Test
+    fun `com permissao ja concedida a troca e imediata sem novo pedido`() = runTest(dispatcher) {
+        val uhf = FonteFalsa("uhf")
+        val barras = FonteFalsa("barras")
+        val viewModel = novoViewModel(
+            fontes = mapOf(OrigemLeitura.RFID_UHF to uhf, OrigemLeitura.CODIGO_BARRAS to barras)
+        )
+        viewModel.atualizarPermissaoCamera(true)
+        advanceUntilIdle()
+
+        viewModel.selecionarModo(OrigemLeitura.CODIGO_BARRAS)
+        advanceUntilIdle()
+
+        assertEquals(0, pedidosDePermissaoCamera)
+        assertEquals(1, barras.iniciadas)
+        assertEquals(OrigemLeitura.CODIGO_BARRAS, viewModel.estado.value.modoSelecionado)
+    }
+
+    @Test
+    fun `permissao concedida sem troca pendente so atualiza a disponibilidade`() = runTest(dispatcher) {
+        val uhf = FonteFalsa("uhf")
+        val barras = FonteFalsa("barras")
+        val viewModel = novoViewModel(
+            fontes = mapOf(OrigemLeitura.RFID_UHF to uhf, OrigemLeitura.CODIGO_BARRAS to barras)
+        )
+        advanceUntilIdle()
+
+        viewModel.atualizarPermissaoCamera(true) // ex.: permissão já concedida em sessão anterior
+        advanceUntilIdle()
+
+        assertEquals(0, barras.iniciadas)
+        assertEquals(OrigemLeitura.RFID_UHF, viewModel.estado.value.modoSelecionado)
+        val modoBarras = viewModel.estado.value.modos.single { it.origem == OrigemLeitura.CODIGO_BARRAS }
+        assertTrue(modoBarras.disponivel)
+    }
+
+    @Test
+    fun `negar a permissao nao derruba os demais modos`() = runTest(dispatcher) {
+        val uhf = FonteFalsa("uhf")
+        val barras = FonteFalsa("barras")
+        val viewModel = novoViewModel(
+            fontes = mapOf(OrigemLeitura.RFID_UHF to uhf, OrigemLeitura.CODIGO_BARRAS to barras)
+        )
+        advanceUntilIdle()
+        viewModel.atualizarConexao(true)
+        viewModel.selecionarModo(OrigemLeitura.CODIGO_BARRAS)
+        viewModel.atualizarPermissaoCamera(false) // CE-03: negar não trava o aplicativo
+
+        val modoUhf = viewModel.estado.value.modos.single { it.origem == OrigemLeitura.RFID_UHF }
+        assertTrue(modoUhf.disponivel)
+
+        uhf.canal.emit(leituraDe("147258", "147258"))
+        advanceUntilIdle()
+        assertEquals(1, viewModel.estado.value.leituras.size)
     }
 }

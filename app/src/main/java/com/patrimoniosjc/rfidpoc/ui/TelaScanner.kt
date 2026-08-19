@@ -18,6 +18,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -45,7 +46,9 @@ fun TelaScanner(
     aoAlternarConexao: () -> Unit,
     aoIniciarLeitura: () -> Unit,
     aoPararLeitura: () -> Unit,
-    aoSelecionarModo: (OrigemLeitura) -> Unit = {}
+    aoSelecionarModo: (OrigemLeitura) -> Unit = {},
+    aoSolicitarPermissaoCamera: () -> Unit = {},
+    previaCamera: (@Composable () -> Unit)? = null
 ) {
     Column(
         modifier = Modifier
@@ -69,9 +72,16 @@ fun TelaScanner(
         SeletorDeModos(
             modos = estado.modos,
             modoSelecionado = estado.modoSelecionado,
-            aoSelecionarModo = aoSelecionarModo
+            aoSelecionarModo = aoSelecionarModo,
+            aoSolicitarPermissaoCamera = aoSolicitarPermissaoCamera
         )
         Spacer(modifier = Modifier.height(12.dp))
+
+        // REQ-06 — a prévia da câmera aparece só com o modo código de barras ativo
+        if (estado.modoSelecionado == OrigemLeitura.CODIGO_BARRAS && previaCamera != null) {
+            previaCamera()
+            Spacer(modifier = Modifier.height(12.dp))
+        }
 
         Button(
             onClick = aoAlternarConexao,
@@ -181,7 +191,8 @@ fun TelaScanner(
 private fun SeletorDeModos(
     modos: List<ModoDaTela>,
     modoSelecionado: OrigemLeitura,
-    aoSelecionarModo: (OrigemLeitura) -> Unit
+    aoSelecionarModo: (OrigemLeitura) -> Unit,
+    aoSolicitarPermissaoCamera: () -> Unit = {}
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -209,6 +220,15 @@ private fun SeletorDeModos(
                         style = MaterialTheme.typography.labelSmall,
                         color = Color(0xFF757575)
                     )
+                }
+                // CE-03 — o caminho para reabrir a solicitação de permissão
+                if (modo.podeReabrirPermissao) {
+                    TextButton(onClick = aoSolicitarPermissaoCamera) {
+                        Text(
+                            text = "Permitir câmera",
+                            style = MaterialTheme.typography.labelSmall
+                        )
+                    }
                 }
             }
         }

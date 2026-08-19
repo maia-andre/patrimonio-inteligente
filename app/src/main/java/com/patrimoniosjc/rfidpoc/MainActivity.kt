@@ -1,24 +1,33 @@
 package com.patrimoniosjc.rfidpoc
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.camera.view.PreviewView
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.runtime.getValue
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import com.patrimoniosjc.rfidpoc.ble.BleManager
 import com.patrimoniosjc.rfidpoc.domain.OrigemLeitura
+import com.patrimoniosjc.rfidpoc.scan.FonteCodigoBarras
 import com.patrimoniosjc.rfidpoc.scan.FonteUhfBle
 import com.patrimoniosjc.rfidpoc.ui.ScannerViewModel
 import com.patrimoniosjc.rfidpoc.ui.TelaScanner
@@ -37,15 +46,50 @@ class MainActivity : ComponentActivity() {
         aoDesligarScanner = { viewModel.scannerDesligado() }
     )
 
+    private val fonteCodigoBarras by lazy { FonteCodigoBarras(this, this) }
+
     private val viewModel: ScannerViewModel by viewModels {
         object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T =
                 ScannerViewModel(
-                    fontes = mapOf(OrigemLeitura.RFID_UHF to fonteUhf),
+                    fontes = mapOf(
+                        OrigemLeitura.RFID_UHF to fonteUhf,
+                        OrigemLeitura.CODIGO_BARRAS to fonteCodigoBarras
+                    ),
                     conectar = { bleManager?.startScan() },
-                    desconectar = { bleManager?.disconnect() }
+                    desconectar = { bleManager?.disconnect() },
+                    pedirPermissaoCamera = { pedirPermissaoCamera() }
                 ) as T
+        }
+    }
+
+    // CE-03: distingue a primeira negativa da permanente (sem diálogo do sistema)
+    private var cameraJaNegada = false
+
+    private val cameraPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { concedida ->
+        if (!concedida) cameraJaNegada = true
+        viewModel.atualizarPermissaoCamera(concedida)
+    }
+
+    /** REQ-12 — o pedido nasce da seleção do modo; negativa permanente leva às configurações (CE-03). */
+    private fun pedirPermissaoCamera() {
+        when {
+            ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) ==
+                PackageManager.PERMISSION_GRANTED ->
+                viewModel.atualizarPermissaoCamera(true)
+
+            cameraJaNegada && !shouldShowRequestPermissionRationale(Manifest.permission.CAMERA) ->
+                startActivity(
+                    Intent(
+                        Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                        Uri.fromParts("package", packageName, null)
+                    )
+                )
+
+            else -> cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
         }
     }
 
@@ -84,7 +128,20 @@ class MainActivity : ComponentActivity() {
                         aoAlternarConexao = viewModel::alternarConexao,
                         aoIniciarLeitura = viewModel::iniciarLeitura,
                         aoPararLeitura = viewModel::pararLeitura,
-                        aoSelecionarModo = viewModel::selecionarModo
+                        aoSelecionarModo = viewModel::selecionarModo,
+                        aoSolicitarPermissaoCamera = viewModel::solicitarPermissaoCamera,
+                        previaCamera = {
+                            AndroidView(
+                                factory = { contexto ->
+                                    PreviewView(contexto).also {
+                                        fonteCodigoBarras.anexarPrevia(it.surfaceProvider)
+                                    }
+                                },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(240.dp)
+                            )
+                        }
                     )
                 }
             }
@@ -119,6 +176,13 @@ class MainActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
+        // Concessão feita fora do fluxo (sessão anterior, tela de configurações)
+        // chega aqui; negativa nunca é reportada por checagem passiva (REQ-12)
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) ==
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            viewModel.atualizarPermissaoCamera(true)
+        }
         viewModel.aoVoltarAoPrimeiroPlano()
     }
 
