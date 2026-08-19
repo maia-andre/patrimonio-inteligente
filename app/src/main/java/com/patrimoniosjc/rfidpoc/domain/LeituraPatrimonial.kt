@@ -12,4 +12,8 @@ data class LeituraPatrimonial(
     val origem: OrigemLeitura,
     val bruto: String,
     val instante: Long
-)
+) {
+    /** Chave de deduplicação (RN-01): leituras com a mesma chave são o mesmo bem, ainda que de origens diferentes. */
+    val chave: String
+        get() = codigo ?: bruto
+}

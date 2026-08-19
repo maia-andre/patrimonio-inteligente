@@ -149,4 +149,89 @@ class ScannerViewModelTest {
         assertTrue(viewModel.estado.value.logs[0].contains("segunda mensagem"))
         assertTrue(viewModel.estado.value.logs[1].contains("primeira mensagem"))
     }
+
+    // ---- INC-03: lista com deduplicação e contador ----
+
+    private fun leituraDe(
+        codigo: String?,
+        bruto: String,
+        origem: OrigemLeitura = OrigemLeitura.RFID_UHF,
+        instante: Long = 1_000L
+    ) = LeituraPatrimonial(
+        codigo = codigo,
+        descricao = null,
+        origem = origem,
+        bruto = bruto,
+        instante = instante
+    )
+
+    @Test
+    fun `estado inicial tem lista vazia para a tela mostrar o estado vazio`() {
+        val viewModel = novoViewModel()
+
+        assertTrue(viewModel.estado.value.leituras.isEmpty())
+    }
+
+    @Test
+    fun `leituras de chaves distintas acumulam com a mais recente no topo`() = runTest(dispatcher) {
+        val viewModel = novoViewModel()
+        advanceUntilIdle()
+
+        fonte.canal.emit(leituraDe("147258", "147258", OrigemLeitura.CODIGO_BARRAS, 1_000L))
+        fonte.canal.emit(leituraDe("369852", "369852", OrigemLeitura.NFC, 2_000L))
+        advanceUntilIdle()
+
+        val leituras = viewModel.estado.value.leituras
+        assertEquals(2, leituras.size)
+        assertEquals("369852", leituras[0].codigo)
+        assertEquals(OrigemLeitura.NFC, leituras[0].origem)
+        assertEquals("147258", leituras[1].codigo)
+        assertEquals(OrigemLeitura.CODIGO_BARRAS, leituras[1].origem)
+    }
+
+    @Test
+    fun `chave repetida nao gera linha nova e sinaliza ja conferido`() = runTest(dispatcher) {
+        val viewModel = novoViewModel()
+        advanceUntilIdle()
+
+        fonte.canal.emit(leituraDe("147258", "147258;Notebook Positivo", instante = 1_000L))
+        fonte.canal.emit(leituraDe("147258", "147258;Notebook Positivo", instante = 2_500L))
+        advanceUntilIdle()
+
+        val estado = viewModel.estado.value
+        assertEquals(1, estado.leituras.size)
+        assertTrue(estado.avisoJaConferido!!.contains("147258"))
+    }
+
+    @Test
+    fun `sinalizacao de duplicata e limitada a uma por segundo para a mesma chave`() = runTest(dispatcher) {
+        val viewModel = novoViewModel()
+        advanceUntilIdle()
+
+        fonte.canal.emit(leituraDe("147258", "147258", instante = 1_000L))
+        fonte.canal.emit(leituraDe("147258", "147258", instante = 2_000L)) // sinaliza
+        fonte.canal.emit(leituraDe("147258", "147258", instante = 2_300L)) // bloqueada
+        fonte.canal.emit(leituraDe("147258", "147258", instante = 3_100L)) // sinaliza de novo
+        advanceUntilIdle()
+
+        val sinalizacoes = viewModel.estado.value.logs.count { it.contains("já conferido") }
+        assertEquals(2, sinalizacoes)
+        assertEquals(1, viewModel.estado.value.leituras.size)
+    }
+
+    @Test
+    fun `leitura nova limpa o aviso de ja conferido`() = runTest(dispatcher) {
+        val viewModel = novoViewModel()
+        advanceUntilIdle()
+
+        fonte.canal.emit(leituraDe("147258", "147258", instante = 1_000L))
+        fonte.canal.emit(leituraDe("147258", "147258", instante = 2_000L))
+        advanceUntilIdle()
+        assertTrue(viewModel.estado.value.avisoJaConferido != null)
+
+        fonte.canal.emit(leituraDe("369852", "369852", instante = 3_000L))
+        advanceUntilIdle()
+        assertEquals(null, viewModel.estado.value.avisoJaConferido)
+        assertEquals(2, viewModel.estado.value.leituras.size)
+    }
 }

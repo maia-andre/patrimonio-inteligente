@@ -1,20 +1,23 @@
-# Build report — 18/08/2026 (INC-02)
+# Build report — 18/08/2026 (INC-03)
 Spec: docs/spec.md, versão 1 (10/08/2026, aprovada)
-Incremento: INC-02 — ScannerViewModel e fonte UHF sobre o BleManager
+Incremento: INC-03 — Lista de leituras com deduplicação e contador
 Rodada: construção
-Testes: 27 passando / 27 total — `sh gradlew test` (unit; instrumentada exige aparelho)
+Testes: 42 passando / 42 total — `sh gradlew test` (unit; instrumentada exige aparelho)
 
 ## Requisitos atendidos
-- **REQ-02** — Atendido — `ui/ScannerViewModel.kt` controla a fonte (iniciar/parar/conectar/desconectar) e expõe `EstadoTelaScanner` por `StateFlow`; a `MainActivity.kt` ficou só com fiação (criação de objetos, permissões BLE e `setContent`) — sem parsing, buffer, deduplicação ou controle de fonte. Coberto por `ScannerViewModelTest` (6 testes com fonte falsa).
-- **REQ-08** — Atendido — `scan/FonteUhfBle.kt` embrulha o `BleManager` por lambdas sem alterá-lo em nada (arquivo `ble/BleManager.kt` intocado); preserva `LED_ON`/`LED_OFF` (constantes `COMANDO_INICIAR`/`COMANDO_PARAR`) e a remontagem por `__END__` via `scan/RemontadorDeFragmentos.kt`. Coberto por `FonteUhfBleTest` (5) e `RemontadorDeFragmentosTest` (4).
-- **REQ-13** — Atendido — `model/BleMessage.kt` removido (`git rm`); antes da remoção, grep confirmou zero referências.
-- **RNF-08** — Atendido — UI segue em Compose (`ui/TelaScanner.kt`, tela movida da MainActivity sem mudança visual); estrutura por responsabilidade: `domain/`, `scan/`, `ble/`, `ui/` (diretório `model/` extinto).
+- **REQ-04** — Atendido — leituras acumulam em memória no `ScannerViewModel` (`EstadoTelaScanner.leituras`); a `TelaScanner` exibe o contador ("Conferidos na sessão: N") e cada linha mostra a chave (código, ou bruto quando o código é nulo), a origem legível (`rotuloDaOrigem`) e o horário (HH:mm:ss do `instante`). Coberto por `AcumuladorDeLeiturasTest` e `ScannerViewModelTest`.
+- **REQ-05** — Atendido — chave já presente não gera linha nova (`AcumuladorDeLeituras`, função pura) e o usuário é sinalizado por card de aviso ("Item X já conferido") + log. Coberto por `chave repetida nao gera linha nova e sinaliza ja conferido`.
+- **RN-01** — Atendido — `LeituraPatrimonial.chave = codigo ?: bruto`; origens diferentes com a mesma chave deduplicam (teste `origens diferentes com a mesma chave sao o mesmo bem`); sem código, deduplica pelo bruto.
+- **RN-06** — Atendido — inserção sempre no topo (`listOf(nova) + listaAtual`); testes verificam a ordem.
+- **RN-07** — Atendido — lista apenas em `MutableStateFlow` (memória); nenhuma persistência adicionada; comentário na classe de estado registra a regra.
+- **CE-01** — Atendido — repetição não cria linha nem incrementa contador; sinalização limitada a 1 ocorrência/segundo por chave via `LimitadorDeSinalizacao` (puro, decide pelo `instante` da leitura — determinístico em teste). Cobertos os limites 400 ms, 999 ms (bloqueia) e 1 000 ms (permite).
+- **CE-14** — Atendido — sem leituras, a tela mostra card de estado vazio explicativo ("Nenhum item conferido ainda..."), não uma lista em branco; o estado inicial vazio é testado no ViewModel.
 
 ## Casos extremos cobertos
-- Nenhum CE da spec pertence a este incremento (CE-10/11/13 são do INC-04). Robustez adicional testada: `__END__` sem fragmentos não emite leitura; `SCANNER_OFF` aciona aviso e não vira leitura; mensagens sucessivas geram leituras independentes com buffer limpo.
+- **CE-01** — `sinalizacao de duplicata e limitada a uma por segundo para a mesma chave` (ViewModel) + `LimitadorDeSinalizacaoTest` (4 testes de limite).
+- **CE-14** — `estado inicial tem lista vazia para a tela mostrar o estado vazio` + card de estado vazio na `TelaScanner`.
 
 ## Perguntas em aberto / pendências
-- O card "Último Ativo Escaneado" continua exibindo o payload bruto (comportamento idêntico ao anterior); a exibição estruturada com código/origem/horário é o REQ-04 (INC-03).
-- Comportamento herdado preservado: interpretação das leituras acontece via `FonteUhfBle` com `instante` de relógio injetável (`System.currentTimeMillis` em produção), o que viabiliza os testes de dedup do INC-03.
-- Dependências novas: `androidx.lifecycle:lifecycle-viewmodel-ktx:2.10.0` (ViewModel) e `kotlinx-coroutines-test:1.10.2` (só em teste).
-- Durante o TDD, 1 teste do ViewModel falhou por corrida de inscrição no `SharedFlow` (coletor do `init` ainda não inscrito); corrigido no próprio teste com `advanceUntilIdle()` antes do `emit` — registro honesto de que a correção foi no teste, não no código de produção.
+- O card "Último Ativo Escaneado" (comportamento herdado do app original, mantido no INC-02) foi substituído pela lista do REQ-04 — a lista é a evolução direta daquele card; o campo `ultimaLeitura` permanece no estado.
+- O aviso "já conferido" é limpo quando entra uma leitura nova de chave distinta (decisão de UI não normatizada pela spec; registrada aqui para o review).
+- A linha da lista exibe exatamente os três campos do REQ-04 (código/chave, origem, horário); a descrição não é exibida por não constar do requisito.

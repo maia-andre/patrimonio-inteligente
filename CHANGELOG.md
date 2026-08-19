@@ -1,5 +1,11 @@
 # Changelog
 
+## INC-03 — Lista de leituras com deduplicação e contador (18/08/2026)
+- REQ-04: as leituras acumulam em lista na tela, com contador de itens conferidos na sessão; cada linha mostra o código, a origem e o horário, com a mais recente no topo.
+- REQ-05: item já conferido não gera linha nova — o aplicativo avisa "já conferido", limitado a uma sinalização por segundo por código (CE-01).
+- RN-01: deduplicação pela chave `código ?: bruto`, inclusive entre origens diferentes.
+- CE-14: sem leituras, a tela mostra estado vazio explicativo em vez de lista em branco.
+
 ## INC-02 — ScannerViewModel e fonte UHF sobre o BleManager (18/08/2026)
 - REQ-02: a lógica de protocolo sai da `MainActivity` — nasce o `ScannerViewModel`, que controla a fonte de leitura e expõe o estado da tela; a Activity vira só fiação.
 - REQ-08: o modo RFID UHF passa a operar como `FonteDeLeitura` (`scan/FonteUhfBle`) sobre o `BleManager` existente, sem reescrevê-lo — `LED_ON`/`LED_OFF` e a remontagem de fragmentos por `__END__` preservados.

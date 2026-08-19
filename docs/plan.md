@@ -1,7 +1,7 @@
 # Plan: Modos de captura — código de barras, NFC e RFID UHF
 
 Spec: docs/spec.md, versão 1 (10/08/2026, aprovada) | Gerado: 18/08/2026
-Progresso: 2/7 incrementos concluídos
+Progresso: 3/7 incrementos concluídos
 
 ## Backlog
 
@@ -22,7 +22,7 @@ Entrega verificável: o app sobe, conecta ao ESP32 (simulação do firmware) e e
 Escopo: mover a lógica de protocolo da `MainActivity` (remontagem por `__END__`, interpretação do payload) para uma `FonteDeLeitura` UHF que embrulha o `BleManager` existente sem reescrevê-lo, preservando `LED_ON`/`LED_OFF` (REQ-08). Criar o `ScannerViewModel` (REQ-02) e organizar os diretórios por responsabilidade — `domain/`, `scan/`, `ble/`, `ui/` (RNF-08). Remover `model/BleMessage.kt` (REQ-13).
 
 ### INC-03 — Lista de leituras com deduplicação e contador
-Status: pendente
+Status: concluído
 Itens da spec: REQ-04, REQ-05 | RN-01, RN-06, RN-07 | CE-01, CE-14
 Depende de: INC-02
 Entrega verificável: leituras UHF acumulam em lista (mais recente no topo) com contador de itens da sessão, cada linha com código, origem e horário; leitura repetida não cria linha e sinaliza "já conferido" (limitada a 1 sinalização/segundo por código); sem leituras, a tela mostra estado vazio explicativo.

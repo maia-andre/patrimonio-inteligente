@@ -1,27 +1,30 @@
-# Review report — 18/08/2026 (INC-02)
-Spec: docs/spec.md, versão 1 (10/08/2026) | Incremento: INC-02 — ScannerViewModel e fonte UHF sobre o BleManager | Build report: 18/08/2026 (INC-02)
+# Review report — 18/08/2026 (INC-03)
+Spec: docs/spec.md, versão 1 (10/08/2026) | Incremento: INC-03 — Lista de leituras com deduplicação e contador | Build report: 18/08/2026 (INC-03)
 ## VEREDITO: APROVADO
 
 ## Verificação requisito a requisito
 | Item | Status | Evidência / Falha |
 |------|--------|-------------------|
-| REQ-02 | Atendido | `ui/ScannerViewModel.kt` seleciona/controla a fonte e expõe `EstadoTelaScanner` via `StateFlow`; `MainActivity.kt` auditada linha a linha: só fiação (criação de objetos, permissões BLE, `setContent`) — grep por `__END__`/buffer/parsing/dedup sem ocorrências. 6 testes com fonte falsa. A seleção entre múltiplas fontes chega no INC-04, conforme nota de cobertura do plano. |
-| REQ-08 | Atendido | `git diff HEAD -- .../ble/` vazio — `BleManager` reaproveitado sem reescrita; `LED_ON`/`LED_OFF` preservados (`FonteUhfBleTest.iniciar envia LED_ON e parar envia LED_OFF`); remontagem `__END__` em `scan/RemontadorDeFragmentos.kt` com 4 testes; verify dirigiu a cadeia real com fragmentos e `SCANNER_OFF`. |
-| REQ-13 | Atendido | `model/BleMessage.kt` removido via `git rm` (status `D`); zero referências confirmadas por grep antes da remoção; diretório `model/` extinto. |
-| RNF-08 | Atendido | Estrutura `ble/ domain/ scan/ ui/` + `MainActivity.kt`; UI em Compose (`ui/TelaScanner.kt`, migrada sem mudança visual ou funcional). |
-| Regressão | Limpa | Suíte completa re-executada pelo auditor com `--rerun-tasks`: 27/27; testes do INC-01 verdes; `domain/` sem diff. |
-| Escopo | Limpo | Conjunto de mudanças = exatamente os arquivos do incremento + docs do ciclo; tela replicada sem funcionalidades novas (card continua exibindo o payload bruto, como antes). |
+| REQ-04 | Atendido | `EstadoTelaScanner.leituras` + `TelaScanner` com "Conferidos na sessão: N" e `LinhaDeLeitura` exibindo chave (código; bruto quando código nulo, coerente com RN-01), `rotuloDaOrigem` e horário HH:mm:ss. Dirigido no verify com saída literal. |
+| REQ-05 | Atendido | `AcumuladorDeLeituras.acumular` (puro) não insere chave repetida; ViewModel sinaliza com card de aviso + log. Testes de acumulador (6) e ViewModel; verify mostrou `contador=2 aviso=Item 147258 já conferido`. |
+| RN-01 | Atendido | `LeituraPatrimonial.chave = codigo ?: bruto`; testes cobrem código presente, código nulo (dedup pelo bruto) e origens diferentes com mesma chave (mesmo bem). |
+| RN-06 | Atendido | Inserção no topo (`listOf(nova) + listaAtual`); ordem verificada em teste e no verify (369852 acima de 147258). |
+| RN-07 | Atendido | Estado só em `MutableStateFlow`; grep do auditor sem `Room`/`SharedPreferences`/`File` em `domain/` e `ui/`. |
+| CE-01 | Atendido | Sem linha nova, contador imóvel, sinalização limitada a 1/s por chave (`LimitadorDeSinalizacao`, decide pelo `instante` — determinístico). Limites 999 ms (bloqueia) e 1 000 ms (permite) testados; verify: 4 duplicatas em rajada → 2 sinalizações. |
+| CE-14 | Atendido | `leituras.isEmpty()` → card "Nenhum item conferido ainda..." em vez de lista em branco; estado inicial vazio testado. |
+| Regressão | Limpa | Suíte re-executada pelo auditor com `--rerun-tasks`: 42/42; `MainActivity`, `ble/` e `scan/` sem diff nesta rodada. |
+| Escopo | Limpo | Mudanças = exatamente os arquivos do incremento; a substituição do card "Último Ativo" pela lista é a materialização do REQ-04 (o card era o display pré-lista das leituras), registrada no build-report. |
 
 ## Qualidade dos testes (TDD)
-- Vermelho comprovado antes do verde (referências não resolvidas). Durante o verde, 1 teste falhou por corrida de inscrição no `SharedFlow` e a correção foi **no teste** (`advanceUntilIdle()` antes do emit) — correta: o comportamento de produção (coletor do `init` inscrito no `viewModelScope` real) não tinha o defeito; o build-report registra isso honestamente.
-- Inversão mental: sem limpar o buffer do remontador, `buffer e limpo apos completar` falha; trocar LED_ON/LED_OFF derruba o teste de comandos; parar de interpretar payload derruba `fragmentos remontados viram leitura interpretada`; inverter a ordem dos logs derruba `log mais recente fica no topo`.
-- Sem CE da spec neste incremento (CE-10/11/13 pertencem ao INC-04); robustez extra coberta (`__END__` vazio, `SCANNER_OFF`, mensagens sucessivas).
-- Itens da definição de concluído tocados por este incremento: "MainActivity.kt não contém parsing..." satisfeito (grep objetivo); "BleMessage.kt não existe mais" satisfeito.
+- Vermelho comprovado antes do verde (referências não resolvidas a `chave`/`AcumuladorDeLeituras`).
+- Inversão mental: trocar prepend por append derruba os testes de ordem; remover o `ifEmpty`-equivalente da dedup (comparar por objeto em vez de chave) derruba o teste de origens diferentes; alterar o intervalo do limitador derruba os testes de 999/1000 ms; não limpar o aviso derruba `leitura nova limpa o aviso`.
+- Valores-limite da RN/CE cobertos (999 ms, 1 000 ms, chaves independentes); duplicata cross-origem coberta.
+- Itens da definição de concluído deste incremento: "duas leituras com a mesma chave → uma linha, contador 1" e "duas leituras de origens diferentes com códigos distintos → duas linhas com suas origens" — ambos com teste dedicado.
 
 ## Segurança
-- Payload BLE é tratado por funções totais (parser sem exceções); nenhum dado sai do aparelho (RNF-07); sem segredos; sem dados pessoais.
-- **Baixa** (observação, não bloqueia): o buffer do `RemontadorDeFragmentos` cresce sem limite se `__END__` nunca chegar, e a lista de logs do estado também é ilimitada — ambos comportamentos herdados da MainActivity original, preservados por exigência do REQ-08. Registrar como candidato a endurecimento em incremento futuro (fora de escopo agora).
-- Dependências novas (`lifecycle-viewmodel-ktx:2.10.0`, `kotlinx-coroutines-test:1.10.2`): sem CVE conhecida; nenhuma dependência de Google Play Services no grafo.
+- Nenhum achado novo. Conteúdo do payload BLE aparece na UI via Compose `Text` (sem interpretação de markup — sem XSS); processamento 100% local (RNF-07); dados fictícios (RNF-03/LGPD).
+- Permanece a observação **baixa** do INC-02 (buffer de fragmentos e logs sem limite — comportamento herdado); a lista de leituras é limitada pelo conjunto de chaves únicas do acervo, sem crescimento por repetição.
+- Nenhuma dependência nova nesta rodada.
 
 ## Correções necessárias (para o /build)
 Nenhuma.

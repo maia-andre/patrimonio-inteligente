@@ -23,6 +23,21 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.patrimoniosjc.rfidpoc.domain.LeituraPatrimonial
+import com.patrimoniosjc.rfidpoc.domain.OrigemLeitura
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+
+/** Rótulo legível de cada origem de leitura. */
+fun rotuloDaOrigem(origem: OrigemLeitura): String = when (origem) {
+    OrigemLeitura.CODIGO_BARRAS -> "Código de barras"
+    OrigemLeitura.NFC -> "NFC"
+    OrigemLeitura.RFID_UHF -> "RFID UHF"
+}
+
+private fun horarioDe(instante: Long): String =
+    SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date(instante))
 
 @Composable
 fun TelaScanner(
@@ -82,47 +97,101 @@ fun TelaScanner(
                 Text("Desliga Scanner")
             }
         }
-        Spacer(modifier = Modifier.height(20.dp))
+        Spacer(modifier = Modifier.height(16.dp))
 
-        estado.ultimaLeitura?.let { leitura ->
+        estado.avisoJaConferido?.let { aviso ->
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(8.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF3E0))
+            ) {
+                Text(
+                    text = aviso,
+                    modifier = Modifier.padding(12.dp),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color(0xFFE65100)
+                )
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+        }
+
+        Text(
+            text = "Conferidos na sessão: ${estado.leituras.size}",
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.Bold
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+
+        if (estado.leituras.isEmpty()) {
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = Color(0xFFE8F5E9)
-                )
+                colors = CardDefaults.cardColors(containerColor = Color(0xFFF5F5F5))
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        text = "Último Ativo Escaneado",
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF2E7D32)
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = leitura.bruto,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Color(0xFF1B5E20)
-                    )
+                Text(
+                    text = "Nenhum item conferido ainda.\nConecte o scanner e leia uma etiqueta para começar.",
+                    modifier = Modifier.padding(16.dp),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color(0xFF616161)
+                )
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+            ) {
+                items(estado.leituras) { leitura ->
+                    LinhaDeLeitura(leitura)
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
                 }
             }
-            Spacer(modifier = Modifier.height(16.dp))
         }
+        Spacer(modifier = Modifier.height(12.dp))
 
         Text(
             text = "Logs:",
             style = MaterialTheme.typography.titleSmall
         )
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(4.dp))
 
         LazyColumn(
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(if (estado.leituras.isEmpty()) 1f else 0.6f)
         ) {
             items(estado.logs) { log ->
                 Text(text = log, style = MaterialTheme.typography.bodySmall)
                 HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
             }
         }
+    }
+}
+
+@Composable
+private fun LinhaDeLeitura(leitura: LeituraPatrimonial) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = leitura.chave,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                text = rotuloDaOrigem(leitura.origem),
+                style = MaterialTheme.typography.bodySmall,
+                color = Color(0xFF757575)
+            )
+        }
+        Text(
+            text = horarioDe(leitura.instante),
+            style = MaterialTheme.typography.bodySmall,
+            color = Color(0xFF757575)
+        )
     }
 }
