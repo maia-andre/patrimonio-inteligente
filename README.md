@@ -126,7 +126,7 @@ graph LR
 
 ## 📸 Os três modos de captura
 
-O aplicativo captura leitura patrimonial por três caminhos complementares. Dois deles — código de barras e NFC — **não exigem hardware nenhum além do próprio celular**: qualquer servidor com um Android na mão consegue conferir bens hoje. O módulo UHF deixou de ser pré-requisito do projeto para ser pré-requisito de apenas um dos três modos.
+O aplicativo captura leitura patrimonial por três caminhos complementares. Dois deles — código de barras e NFC — **não exigem hardware nenhum além do próprio celular**: qualquer servidor com um Android na mão consegue conferir bens hoje. O módulo UHF deixou de ser pré-requisito do projeto para ser pré-requisito de apenas um dos três modos. Há ainda o **lançamento manual**, para o bem cuja etiqueta está ilegível ou ausente: o código digitado entra na mesma lista, com a mesma deduplicação.
 
 | Modo | Faixa / norma | Hardware | Alcance | Itens por leitura |
 |---|---|---|---|---|
@@ -152,6 +152,7 @@ No modo código de barras são aceitos **Code 128, Code 39 e QR Code** — EAN e
 | Controle de GPIO / feedback físico | ✅ **Funciona** | LED onboard como indicador de varredura ativa |
 | Leitura por código de barras (câmera) | ✅ **Funciona** | CameraX + ZXing: Code 128, Code 39 e QR Code, sem Google Play Services |
 | Leitura por NFC | ✅ **Funciona** | Reader mode NfcA/B/F/V; código via registro NDEF de texto ou UID |
+| Lançamento manual de código | ✅ **Funciona** | Campo de texto para o bem sem etiqueta legível; mesma lista e deduplicação |
 | Fluxo de leitura patrimonial | 🟡 **Simulado** | O ESP32 devolve um registro patrimonial fictício após 800 ms |
 | Leitura de tag RFID UHF real | ❌ **Não existe** | **Bloqueado: falta adquirir o módulo leitor** |
 | Persistência local (histórico) | ❌ **Não existe** | Planejado com Room |
@@ -221,6 +222,7 @@ A lista de materiais abaixo vale **só para o modo RFID UHF**. Para conhecer o f
 1. Instale o aplicativo (seção [Aplicativo Android](#aplicativo-android)) em qualquer Android 9+ (API 28).
 2. Selecione o modo **código de barras** e aponte a câmera para um Code 128, Code 39 ou QR Code fictício — vale imprimir ou exibir na tela de outro dispositivo.
 3. Em aparelho com NFC, selecione o modo **NFC** e encoste em uma etiqueta NfcA/B/F/V — o código vem do registro NDEF de texto ou, na falta dele, do UID.
+4. Para um bem sem etiqueta legível, selecione **Manual** e digite o código.
 
 É a mesma lista, com a mesma deduplicação e o mesmo contador do modo UHF — só muda a origem da leitura.
 

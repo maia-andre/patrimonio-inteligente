@@ -37,6 +37,8 @@ data class EstadoTelaScanner(
     val statusTexto: String = "Desconectado",
     val modoSelecionado: OrigemLeitura = OrigemLeitura.RFID_UHF,
     val modos: List<ModoDaTela> = emptyList(),
+    /** A fonte selecionada está capturando (câmera aberta, antena ativa). Some ao "fechar". */
+    val capturando: Boolean = false,
     val ultimaLeitura: LeituraPatrimonial? = null,
     val leituras: List<LeituraPatrimonial> = emptyList(),
     val avisoJaConferido: String? = null,
@@ -140,7 +142,7 @@ class ScannerViewModel(
         novaFonte.iniciar()
         capturaEmAndamento = true
 
-        _estado.update { it.copy(modoSelecionado = origem) }
+        _estado.update { it.copy(modoSelecionado = origem, capturando = true) }
         registrarLog("Modo ${rotuloDaOrigem(origem)} ativado")
     }
 
@@ -178,11 +180,14 @@ class ScannerViewModel(
     fun iniciarLeitura() {
         fonteAtiva?.iniciar()
         capturaEmAndamento = true
+        _estado.update { it.copy(capturando = true) }
     }
 
+    /** "Fechar câmera" e "Parar" chegam aqui: a fonte para, o modo continua selecionado. */
     fun pararLeitura() {
         fonteAtiva?.parar()
         capturaEmAndamento = false
+        _estado.update { it.copy(capturando = false) }
     }
 
     /** CE-13 — segundo plano para a fonte ativa, liberando câmera/antena/scanner. */

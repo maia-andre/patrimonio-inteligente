@@ -65,9 +65,9 @@ class FonteDeLeituraTest {
     }
 
     @Test
-    fun `origem de leitura tem exatamente os tres modos`() {
+    fun `origem de leitura tem os tres modos de captura e o lancamento manual`() {
         assertEquals(
-            listOf("CODIGO_BARRAS", "NFC", "RFID_UHF"),
+            listOf("CODIGO_BARRAS", "NFC", "RFID_UHF", "MANUAL"),
             OrigemLeitura.entries.map { it.name }
         )
     }

@@ -1,58 +1,87 @@
 package com.patrimoniosjc.rfidpoc.ui.theme
 
-import android.app.Activity
-import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.dynamicDarkColorScheme
-import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.graphics.Color
 
-private val DarkColorScheme = darkColorScheme(
-    primary = Purple80,
-    secondary = PurpleGrey80,
-    tertiary = Pink80
-)
-
-private val LightColorScheme = lightColorScheme(
-    primary = Purple40,
-    secondary = PurpleGrey40,
-    tertiary = Pink40
-
-    /* Other default colors to override
-    background = Color(0xFFFFFBFE),
-    surface = Color(0xFFFFFBFE),
+private val EsquemaClaro = lightColorScheme(
+    primary = AzulPlaca,
     onPrimary = Color.White,
+    primaryContainer = AzulPlacaContainer,
+    onPrimaryContainer = AzulPlacaEscuro,
+    secondary = Ardosia,
     onSecondary = Color.White,
-    onTertiary = Color.White,
-    onBackground = Color(0xFF1C1B1F),
-    onSurface = Color(0xFF1C1B1F),
-    */
+    secondaryContainer = ArdosiaContainer,
+    onSecondaryContainer = ArdosiaEscura,
+    background = PapelFrio,
+    onBackground = TintaFria,
+    surface = PapelFrio,
+    onSurface = TintaFria,
+    surfaceVariant = SuperficieVarianteClara,
+    onSurfaceVariant = TintaSecundariaClara,
+    outline = ContornoClaro
 )
 
+private val EsquemaEscuro = darkColorScheme(
+    primary = AzulPlacaNoturno,
+    onPrimary = AzulPlacaEscuro,
+    primaryContainer = AzulPlacaContainerNoturno,
+    onPrimaryContainer = AzulPlacaContainer,
+    secondary = ArdosiaNoturna,
+    onSecondary = ArdosiaEscura,
+    secondaryContainer = ArdosiaContainerNoturna,
+    onSecondaryContainer = ArdosiaContainer,
+    background = FundoNoturno,
+    onBackground = TintaNoturna,
+    surface = FundoNoturno,
+    onSurface = TintaNoturna,
+    surfaceVariant = SuperficieVarianteNoturna,
+    onSurfaceVariant = TintaSecundariaNoturna,
+    outline = ContornoNoturno
+)
+
+/** Cores de estado (conectado, aviso de duplicata). Não são a cor de destaque. */
+data class CoresDeEstado(
+    val conectado: Color,
+    val avisoFundo: Color,
+    val avisoTexto: Color
+)
+
+private val CoresDeEstadoClaras = CoresDeEstado(
+    conectado = VerdeConectado,
+    avisoFundo = AmbarAvisoFundo,
+    avisoTexto = AmbarAvisoTexto
+)
+
+private val CoresDeEstadoNoturnas = CoresDeEstado(
+    conectado = VerdeConectadoNoturno,
+    avisoFundo = AmbarAvisoFundoNoturno,
+    avisoTexto = AmbarAvisoTextoNoturno
+)
+
+val LocalCoresDeEstado = staticCompositionLocalOf { CoresDeEstadoClaras }
+
+/**
+ * Tema do aplicativo. Sem cor dinâmica de propósito: a identidade visual
+ * não muda com o papel de parede do aparelho.
+ */
 @Composable
 fun RfidpocTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    // Dynamic color is available on Android 12+
-    dynamicColor: Boolean = true,
     content: @Composable () -> Unit
 ) {
-    val colorScheme = when {
-        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            val context = LocalContext.current
-            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-        }
-
-        darkTheme -> DarkColorScheme
-        else -> LightColorScheme
+    CompositionLocalProvider(
+        LocalCoresDeEstado provides if (darkTheme) CoresDeEstadoNoturnas else CoresDeEstadoClaras
+    ) {
+        MaterialTheme(
+            colorScheme = if (darkTheme) EsquemaEscuro else EsquemaClaro,
+            typography = Typography,
+            content = content
+        )
     }
-
-    MaterialTheme(
-        colorScheme = colorScheme,
-        typography = Typography,
-        content = content
-    )
 }

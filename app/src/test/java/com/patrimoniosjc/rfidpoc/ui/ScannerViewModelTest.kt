@@ -246,11 +246,15 @@ class ScannerViewModelTest {
     // ---- INC-04: seletor de modos e ciclo de vida das fontes ----
 
     @Test
-    fun `seletor lista os tres modos com motivo legivel quando indisponiveis`() {
+    fun `seletor lista os quatro modos com motivo legivel quando indisponiveis`() {
         val viewModel = novoViewModel()
 
         val modos = viewModel.estado.value.modos
-        assertEquals(3, modos.size)
+        assertEquals(4, modos.size)
+
+        val manual = modos.single { it.origem == OrigemLeitura.MANUAL }
+        assertFalse(manual.disponivel)
+        assertEquals("Ainda não disponível nesta versão", manual.motivo)
 
         val uhf = modos.single { it.origem == OrigemLeitura.RFID_UHF }
         assertFalse(uhf.disponivel)
@@ -618,5 +622,59 @@ class ScannerViewModelTest {
         uhf.canal.emit(leituraDe("147258", "147258"))
         advanceUntilIdle()
         assertEquals(1, viewModel.estado.value.leituras.size)
+    }
+
+    // ---- Redesenho (03/09/2026): lançamento manual e estado de captura ----
+
+    @Test
+    fun `modo manual com fonte presente esta disponivel sem permissao nem hardware`() {
+        val manual = FonteFalsa("manual")
+        val viewModel = novoViewModel(
+            fontes = mapOf(OrigemLeitura.RFID_UHF to fonte, OrigemLeitura.MANUAL to manual)
+        )
+
+        val modoManual = viewModel.estado.value.modos.single { it.origem == OrigemLeitura.MANUAL }
+        assertTrue(modoManual.disponivel)
+        assertNull(modoManual.motivo)
+    }
+
+    @Test
+    fun `leitura da fonte manual entra na lista com a origem manual e deduplica`() = runTest(dispatcher) {
+        val manual = FonteFalsa("manual")
+        val viewModel = novoViewModel(
+            fontes = mapOf(OrigemLeitura.RFID_UHF to fonte, OrigemLeitura.MANUAL to manual)
+        )
+        advanceUntilIdle()
+        viewModel.selecionarModo(OrigemLeitura.MANUAL)
+        advanceUntilIdle()
+
+        manual.canal.emit(leituraDe("PATR-147258", "PATR-147258", OrigemLeitura.MANUAL))
+        manual.canal.emit(leituraDe("PATR-147258", "PATR-147258", OrigemLeitura.MANUAL, instante = 2_000L))
+        advanceUntilIdle()
+
+        val leituras = viewModel.estado.value.leituras
+        assertEquals(1, leituras.size)
+        assertEquals(OrigemLeitura.MANUAL, leituras[0].origem)
+        assertEquals("Item PATR-147258 já conferido", viewModel.estado.value.avisoJaConferido)
+    }
+
+    @Test
+    fun `capturando acompanha iniciar, parar e a troca de modo`() = runTest(dispatcher) {
+        val manual = FonteFalsa("manual")
+        val viewModel = novoViewModel(
+            fontes = mapOf(OrigemLeitura.RFID_UHF to fonte, OrigemLeitura.MANUAL to manual)
+        )
+        advanceUntilIdle()
+        assertFalse(viewModel.estado.value.capturando)
+
+        viewModel.iniciarLeitura()
+        assertTrue(viewModel.estado.value.capturando)
+
+        viewModel.pararLeitura()
+        assertFalse(viewModel.estado.value.capturando)
+
+        viewModel.selecionarModo(OrigemLeitura.MANUAL)
+        advanceUntilIdle()
+        assertTrue(viewModel.estado.value.capturando)
     }
 }

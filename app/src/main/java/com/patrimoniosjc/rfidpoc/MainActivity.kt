@@ -10,18 +10,16 @@ import android.os.Bundle
 import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
@@ -29,11 +27,13 @@ import androidx.lifecycle.ViewModelProvider
 import com.patrimoniosjc.rfidpoc.ble.BleManager
 import com.patrimoniosjc.rfidpoc.domain.OrigemLeitura
 import com.patrimoniosjc.rfidpoc.scan.FonteCodigoBarras
+import com.patrimoniosjc.rfidpoc.scan.FonteManual
 import com.patrimoniosjc.rfidpoc.scan.FonteNfc
 import com.patrimoniosjc.rfidpoc.scan.FonteUhfBle
 import com.patrimoniosjc.rfidpoc.ui.EstadoNfc
 import com.patrimoniosjc.rfidpoc.ui.ScannerViewModel
 import com.patrimoniosjc.rfidpoc.ui.TelaScanner
+import com.patrimoniosjc.rfidpoc.ui.theme.RfidpocTheme
 
 /**
  * Só faz a fiação: cria BleManager, fonte UHF e ViewModel, pede as permissões
@@ -53,6 +53,8 @@ class MainActivity : ComponentActivity() {
 
     private val fonteNfc by lazy { FonteNfc(this) }
 
+    private val fonteManual = FonteManual()
+
     private val viewModel: ScannerViewModel by viewModels {
         object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
@@ -61,7 +63,8 @@ class MainActivity : ComponentActivity() {
                     fontes = mapOf(
                         OrigemLeitura.RFID_UHF to fonteUhf,
                         OrigemLeitura.CODIGO_BARRAS to fonteCodigoBarras,
-                        OrigemLeitura.NFC to fonteNfc
+                        OrigemLeitura.NFC to fonteNfc,
+                        OrigemLeitura.MANUAL to fonteManual
                     ),
                     conectar = { bleManager?.startScan() },
                     desconectar = { bleManager?.disconnect() },
@@ -112,6 +115,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
 
         bleManager = BleManager(
             context = this,
@@ -123,7 +127,7 @@ class MainActivity : ComponentActivity() {
         checkPermissions()
 
         setContent {
-            MaterialTheme {
+            RfidpocTheme {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
@@ -136,16 +140,15 @@ class MainActivity : ComponentActivity() {
                         aoPararLeitura = viewModel::pararLeitura,
                         aoSelecionarModo = viewModel::selecionarModo,
                         aoSolicitarPermissaoCamera = viewModel::solicitarPermissaoCamera,
-                        previaCamera = {
+                        aoRegistrarManual = fonteManual::registrar,
+                        previaCamera = { modificador ->
                             AndroidView(
                                 factory = { contexto ->
                                     PreviewView(contexto).also {
                                         fonteCodigoBarras.anexarPrevia(it.surfaceProvider)
                                     }
                                 },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(240.dp)
+                                modifier = modificador
                             )
                         }
                     )

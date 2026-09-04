@@ -1,5 +1,15 @@
 # Changelog
 
+## Redesenho da tela, lançamento manual e ícone (03/09/2026)
+Feito fora do ciclo de spec, por decisão do usuário, depois do primeiro smoke test em aparelho real (Galaxy A34, Android 16): a tela do INC-04 era uma colagem do seletor de modos sobre a tela antiga do BLE. Registro em `docs/interno/smoke-test-2026-09-03.md`.
+- Tela com um só sistema de controle: o seletor de modos manda e o painel abaixo mostra o que o modo selecionado precisa — prévia da câmera com botão de fechar, instrução de espera do NFC, conexão e comandos do scanner BLE só dentro do modo UHF, campo do lançamento manual. A lista da sessão é o conteúdo principal, com a última leitura em destaque; o registro técnico fica recolhido.
+- Motivo de indisponibilidade com a ação que o resolve: "Conectar" ao lado de "Scanner BLE não conectado", no mesmo padrão de "Permitir câmera" (CE-03).
+- Lançamento manual: nova origem `MANUAL`, `interpretarCodigoManual` (função pura, RNF-02) e `FonteManual`; entra na mesma lista, com a mesma deduplicação (RN-01).
+- `capturando` no estado do `ScannerViewModel`: "Fechar câmera" e "Parar" param a fonte sem trocar de modo; "Abrir câmera" e "Retomar" reiniciam.
+- Tema próprio (`RfidpocTheme`): paleta azul-placa em claro e escuro, sem cor dinâmica; cores de estado separadas da cor de destaque; escala tipográfica definida. Fim das cores fixas em hexadecimal na tela. Conteúdo respeita as barras do sistema (edge-to-edge).
+- Ícone adaptativo novo (placa patrimonial com barras e ondas de rádio) e rótulo do launcher "Patrimônio".
+- Suíte: 95 testes (9 novos — interpretador e fonte manual, quatro modos no seletor, `capturando`).
+
 ## INC-07 — Documentação: README e CONTRIBUTING (19/08/2026)
 - REQ-14: README atualizado — nova seção "Os três modos de captura" (tabela de perfis + advertência NFC ≠ UHF), duas linhas funcionais no "Estado real", gargalo delimitado ao modo UHF, fecho sem o pré-requisito de R$ 1.200, caminho "Comece sem hardware nenhum", diagrama com as três origens, débito técnico registrando o payload `codigo;descricao` já aceito no app, roadmap e sumário atualizados.
 - REQ-15: CONTRIBUTING delimita o bloqueio de R$ 1.200 ao modo UHF, preservando o pedido de acesso a leitor como prioritário.
