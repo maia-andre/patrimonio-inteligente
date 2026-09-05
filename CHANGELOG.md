@@ -1,5 +1,14 @@
 # Changelog
 
+## Bancada do módulo UHF R200 (05/09/2026)
+Fora do ciclo de spec: o módulo leitor YPD-R200 (Impinj E710) chegou e foi ligado ao ESP32 pela primeira vez. Registro completo em `docs/HARDWARE_R200.md`.
+- `docs/HARDWARE_R200.md`: documento de bancada alinhado ao repositório — pinagem real da placa (`J3` em 3,3 V, furo `5V` separado), o que o firmware da Fase 2 precisa entregar (payload `EPC;` na RN-03, `SCAN_START`/`SCAN_STOP` com sinônimos, janela de silêncio por EPC), saída para Windows sem driver do CH340, diagnóstico dos sintomas vistos e registro do dia.
+- `firmware/teste_r200.py`: parser resiliente a `0xBB` dentro do EPC e a tamanho impossível; espera o reset do ESP32 ao abrir a porta.
+- `firmware/ponte_uart/`: ESP32 como conversor USB-serial para o R200 (validado em loop).
+- `firmware/diag_r200/`: ESP32 testa a UART do R200 sozinho, varrendo 9600–230400, com o nível de repouso do `RX2` sem o pull-up interno.
+- README e CONTRIBUTING: o modo UHF deixa de estar "bloqueado por uma compra"; módulo trocado de YRM100 para YPD-R200 na lista de materiais, no diagrama e no roadmap; estado real ganha a linha "Módulo leitor UHF na bancada".
+- Provado: módulo vivo e alimentado pelo `VIN` do ESP32, fiação da Fase 2 correta, módulo reage a comandos. Pendente: solda dos pinos (contato sem solda deforma a UART), velocidade da serial, primeira tag.
+
 ## Redesenho da tela, lançamento manual e ícone (03/09/2026)
 Feito fora do ciclo de spec, por decisão do usuário, depois do primeiro smoke test em aparelho real (Galaxy A34, Android 16): a tela do INC-04 era uma colagem do seletor de modos sobre a tela antiga do BLE. Registro em `docs/interno/smoke-test-2026-09-03.md`.
 - Tela com um só sistema de controle: o seletor de modos manda e o painel abaixo mostra o que o modo selecionado precisa — prévia da câmera com botão de fechar, instrução de espera do NFC, conexão e comandos do scanner BLE só dentro do modo UHF, campo do lançamento manual. A lista da sessão é o conteúdo principal, com a última leitura em destaque; o registro técnico fica recolhido.

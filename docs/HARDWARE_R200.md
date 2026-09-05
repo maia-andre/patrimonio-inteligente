@@ -36,7 +36,7 @@ Cobre desde o primeiro teste do módulo no PC até a ligação definitiva com o 
 ## 2. Fase 1 — teste isolado no PC
 
 Objetivo: provar que o módulo está vivo **antes** de envolver o ESP32.
-Se algo falhar depois, você já sabe que não é o módulo.
+Se algo falhar depois, você já sabe que não é o módulo. Em Windows sem administrador, pule para a seção 2b: o caminho pelo micro-USB não abre.
 
 ### Passos
 
@@ -88,7 +88,7 @@ A placa vem **sem pinos soldados**. Dois grupos de furos importam:
 
 O micro-USB, o CH340 e o `J3` compartilham a única UART do módulo. Portanto: USB do R200 desconectado enquanto o ESP32 estiver no `J3`.
 
-Para pôr pinos: cortar 4 posições da barra de pinos em L e soldar em `J3`, mais 1 pino reto no furo `5V`. Sem ferro de solda, pino encaixado e inclinado no furo serve para os comandos de versão, que puxam pouca corrente; para inventário o contato precisa ser firme.
+Para pôr pinos: cortar 4 posições da barra de pinos e **soldar** em `J3`, mais 1 pino reto soldado no furo `5V`. Não há atalho sem solda: em 05/09/2026 foram tentados pino em L inclinado no furo, pino reto atravessando o furo com a placa apoiada na protoboard e pressão com o dedo. Alimentação (`5V`, `GND`) até funciona assim, porque a placa liga e não reinicia; os sinais `TXD`/`RXD` não, porque o contato fica resistivo e a UART recebe só bytes deformados (ver seção 6). Dez minutos de ferro resolvem o que uma tarde de improviso não resolveu.
 
 ### Pinagem
 
@@ -145,6 +145,8 @@ BB | Type | Cmd | LenMSB | LenLSB | Params... | Checksum | 7E
 
 `Checksum` = soma dos bytes de `Type` até o último parâmetro, byte baixo.
 
+Velocidade: **115200 8N1 é a suposição de fábrica, ainda não confirmada** neste módulo. O `diag_r200.ino` varre 9600 a 230400 e mostra em qual delas volta um frame limpo `BB 01 03 ...`; anotar aqui quando confirmar.
+
 ### Comandos usados no teste
 
 | Ação | Frame |
@@ -198,14 +200,43 @@ Para bancada com potência baixa é o caminho normal. **Para o sistema em produ�
 | `[aviso] checksum inválido` | Ruído na linha, cabo longo demais, ou disputa de UART (USB + ESP32 ao mesmo tempo). Um aviso isolado no meio de leituras boas é normal: o parser se ressincroniza sozinho. |
 | Responde a comandos mas não lê tag | Antena mal rosqueada; potência baixa demais; tag encostada em metal sem ser anti-metal; distância. Começar com a tag a 5–10 cm. |
 | Módulo reinicia durante o inventário | Alimentação insuficiente — pico de TX. Fonte externa, contato firme no VCC/GND. |
+| `diag_r200`: `RX2 em repouso` alterna entre `0` e `1` de uma linha para outra | Contato do `TXD` indo e vindo. Pino sem solda. |
+| `diag_r200`: respostas só com bytes como `00 00 00 80 C0 E0 F0 FC FE`, em todas as velocidades | Não é velocidade errada: é linha que fica em baixo e sobe devagar, assinatura de contato resistivo. Pino sem solda. Velocidade errada dá lixo diferente, e em uma das velocidades o frame sai limpo. |
+| Monitor serial cheio de caracteres estranhos | Velocidade do monitor diferente de 115200, ou a placa está com o `ponte_uart` (que repassa bytes binários crus) em vez do `diag_r200`. |
 
 ---
 
-## 7. Próximos passos
+## 7. Ferramentas de bancada (em `firmware/`)
 
-- [ ] Fase 1 concluída — módulo responde e lê tag
-- [ ] Fase 2 — ESP32 lendo via UART2, saída BLE `EPC;` (RN-03), RSSI no log serial
+| Ferramenta | Roda em | Para quê |
+|---|---|---|
+| `teste_r200.py` | PC, Python 3 + pyserial | Versão, região, potência, inventário único e contínuo com lista de EPCs. Funciona tanto pelo micro-USB do R200 (precisa do driver CH340) quanto pela porta do ESP32 com a ponte gravada. |
+| `ponte_uart/ponte_uart.ino` | ESP32 | Repassa bytes USB ↔ UART2 sem interpretar. Faz o ESP32 de conversor USB-serial para o R200 quando o Windows não tem driver do CH340. |
+| `diag_r200/diag_r200.ino` | ESP32 | Sem PC no meio: manda a versão de hardware em cada velocidade de 9600 a 230400, em ciclo, e imprime no monitor serial o nível de repouso do `RX2` (pull-up interno desligado, então `1` é prova real) e os bytes que voltam. Para mexer nos fios com o monitor aberto e para descobrir a velocidade do módulo. |
+
+Nenhuma das três é o firmware do projeto, que continua em `firmware/firmware.ino`. As duas do ESP32 compilam com o core esp32 3.3.11 para a placa `esp32:esp32:esp32doit-devkit-v1`.
+
+## 8. Registro de bancada — 05/09/2026
+
+Máquina do trabalho, Windows 11 sem administrador. Montagem: R200 deitado sobre a protoboard com pinos retos sem solda em `J3` (`a20` a `a23`) e no furo `5V`; ESP32 fora da protoboard, jumpers fêmea-fêmea; `5V` do R200 pelo `VIN` do ESP32; antena de painel no `CON1`.
+
+O que ficou provado:
+
+- O CH340 do R200 não ganha driver nesta máquina (seção 2b). O ESP32 (CH9102) funciona com o driver embutido do Windows.
+- Ponte serial no ESP32 validada em loop (`RX2` ligado ao `TX2`): cada frame enviado voltou idêntico.
+- O R200 liga alimentado pelo `VIN` do ESP32: LED verde, bipe de boot, sem reinício durante os testes de comando.
+- Com o pull-up interno desligado, `RX2 em repouso = 1` sempre que o pino do `TXD` encostava: o módulo está ligado e segurando a linha, ou seja, **o módulo está vivo e a fiação da Fase 2 está correta**.
+- O módulo reage ao comando quando o `RXD` encosta: chegaram respostas de 10 a 54 bytes, mas deformadas (`00 80 C0 E0 F0 FC FE`) em todas as velocidades, e `RX2 em repouso` alternando `0`/`1`. Diagnóstico: contato resistivo dos pinos sem solda nos furos.
+
+O que não ficou provado: a velocidade da UART do módulo e a leitura de uma tag. Os dois dependem do contato firme.
+
+## 9. Próximos passos
+
+- [ ] **Soldar** 4 pinos em `J3` e 1 pino no furo `5V` (casa, ferro de solda)
+- [ ] Gravar `diag_r200` e ler um ciclo: `RX2 em repouso = 1` fixo e o frame `BB 01 03 ...` limpo em uma velocidade. Anotar a velocidade na seção 4 e ajustar `BAUD` no `teste_r200.py` e no `ponte_uart.ino` se não for 115200
+- [ ] Gravar `ponte_uart` e rodar `teste_r200.py COM3`: versão, região, potência, inventário com uma tag Higgs3 a 5–10 cm
+- [ ] Fase 2 — firmware do projeto lendo o R200 via UART2, saída BLE `EPC;` (RN-03), RSSI no log serial
 - [ ] Testar tags ABS anti-metal em superfície metálica real (datasheet não substitui teste físico)
 - [ ] Comparar alcance Higgs3 adesiva vs. ABS anti-metal, em papel e em metal
-- [ ] Levantar curva de potência × alcance (18 / 20 / 22 / 26 dBm)
+- [ ] Levantar curva de potência × alcance (18 / 20 / 22 / 26 dBm) — pelo `teste_r200.py`, que dá o RSSI por leitura
 - [ ] Confirmar com a Proxion: homologação ANATEL por escrito, faixa de frequência, acesso ao SDK Zebra
