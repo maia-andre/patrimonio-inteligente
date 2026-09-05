@@ -22,3 +22,7 @@ local.properties
 
 # Correspondência institucional e documentos nominais.
 /docs/interno/
+
+# Python (script de bancada do R200)
+__pycache__/
+*.pyc
