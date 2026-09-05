@@ -63,6 +63,18 @@ O micro-USB da placa **não é só alimentação** — ele passa por um converso
 
 ---
 
+### 2b. Windows sem driver do CH340 (sem administrador)
+
+O micro-USB do R200 tem um **CH340** (VID `1A86`, PID `7523`), que exige o driver de fabricante da WCH. Em máquina corporativa sem administrador, e com o Windows Update apontado para servidor interno, o driver não vem sozinho: o aparelho fica como "USB Serial" com erro, código 28. Foi o caso na máquina do trabalho em 05/09/2026.
+
+O ESP32 DevKit **não** tem esse problema: seu conversor é um **CH9102** (PID `55D4`), que fala USB CDC e usa o driver `usbser` embutido no Windows. Foi assim que o ESP32 sempre funcionou sem administrador.
+
+Três saídas, em ordem de preferência:
+
+1. **ESP32 como ponte serial.** Gravar `firmware/ponte_uart/ponte_uart.ino` no ESP32 e ligar o R200 nos pinos conforme a seção 3, com o micro-USB do R200 **desconectado** e a alimentação vindo de fonte 5 V. O `teste_r200.py` roda sem alteração contra a porta do ESP32. Vantagem: já valida a fiação da Fase 2.
+2. **Celular Android com cabo OTG.** O aplicativo *Serial USB Terminal* (Kai Morich) fala com CH340 sem driver nem root; em modo hexadecimal dá para mandar os frames da seção 4 e ver a resposta. Serve para provar que o módulo está vivo.
+3. **Notebook Linux.** O kernel reconhece o CH340 nativamente (`/dev/ttyUSB0`).
+
 ## 3. Fase 2 — ligação com o ESP32
 
 Só depois que a Fase 1 passar.
@@ -160,7 +172,7 @@ Para bancada com potência baixa é o caminho normal. **Para o sistema em produ�
 
 | Sintoma | Causa provável |
 |---|---|
-| Porta não aparece na listagem | Driver do conversor USB (CH340 ou CP2102). É o mesmo do ESP32 — checar no Gerenciador de Dispositivos. |
+| Porta não aparece na listagem | Driver do conversor USB. No Gerenciador de Dispositivos, "USB Serial" com código 28 confirma. O ESP32 usa outro chip (CH9102) e não serve de referência. Ver seção 2b. |
 | Porta abre mas `RX: (sem resposta)` | Baud errado (deve ser 115200); ou cabo USB só de carga, sem linhas de dados. Testar outro cabo. |
 | `[aviso] checksum inválido` | Ruído na linha, cabo longo demais, ou disputa de UART (USB + ESP32 ao mesmo tempo). Um aviso isolado no meio de leituras boas é normal: o parser se ressincroniza sozinho. |
 | Responde a comandos mas não lê tag | Antena mal rosqueada; potência baixa demais; tag encostada em metal sem ser anti-metal; distância. Começar com a tag a 5–10 cm. |

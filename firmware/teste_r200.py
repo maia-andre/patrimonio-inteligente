@@ -2,7 +2,9 @@
 """
 teste_r200.py — Teste de bancada do modulo UHF Invelion YPD-R200 (Impinj E710)
 
-Roda no PC (notebook), conectado ao modulo pelo micro-USB da placa.
+Roda no PC (notebook), conectado ao modulo pelo micro-USB da placa
+(precisa do driver CH340) ou por um ESP32 gravado com ponte_uart/ponte_uart.ino
+(usa o driver embutido do Windows; ver docs/HARDWARE_R200.md).
 NAO e gravado no modulo. O R200 ja tem firmware de fabrica.
 
 Uso:
@@ -157,7 +159,10 @@ def main():
     print(f"Abrindo {porta} a {BAUD} baud...")
 
     with serial.Serial(porta, BAUD, timeout=0.2) as ser:
-        time.sleep(0.5)
+        # 2 s: se a porta for um ESP32 rodando ponte_uart.ino, abrir a porta
+        # reinicia a placa (DTR) e ela precisa desse tempo para voltar.
+        time.sleep(2.0)
+        ser.reset_input_buffer()
 
         # 1) O modulo esta vivo?
         enviar(ser, CMD_INFO(0x00), "Versao de hardware")
