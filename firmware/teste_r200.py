@@ -58,8 +58,19 @@ REGIOES = {"china900": 0x01, "us": 0x02, "eu": 0x03, "china800": 0x04}
 
 
 # ---------------------------------------------------------------- parser
+# Maior frame que o modulo emite: notificacao de tag com EPC de ate 62 bytes
+# (RSSI 1 + PC 2 + EPC 62 + CRC 2 = 67 params). Acima disso e cabecalho falso.
+MAX_PARAMS = 128
+FRAME_MINIMO = 7  # BB Type Cmd LenMSB LenLSB Checksum 7E
+
+
 def extrair_frames(buffer: bytearray):
-    """Consome o buffer e devolve os frames completos encontrados."""
+    """Consome o buffer e devolve os frames completos e validos encontrados.
+
+    Um 0xBB pode aparecer dentro do EPC ou do RSSI. Por isso nada e descartado
+    antes de validar o frame inteiro: se o candidato falha no tamanho, no 0x7E
+    ou no checksum, descarta-se so o primeiro byte e procura-se o proximo 0xBB.
+    """
     frames = []
     while True:
         try:
@@ -71,27 +82,30 @@ def extrair_frames(buffer: bytearray):
         if inicio > 0:
             del buffer[:inicio]
 
-        if len(buffer) < 7:  # frame minimo
-            break
+        if len(buffer) < FRAME_MINIMO:
+            break  # frame ainda chegando
 
         tam_params = (buffer[3] << 8) | buffer[4]
-        tam_total = 7 + tam_params
+        if tam_params > MAX_PARAMS:
+            del buffer[0]  # cabecalho falso: tamanho impossivel
+            continue
 
+        tam_total = FRAME_MINIMO + tam_params
         if len(buffer) < tam_total:
             break  # frame ainda chegando
 
-        frame = bytes(buffer[:tam_total])
-        del buffer[:tam_total]
+        candidato = bytes(buffer[:tam_total])
+        corpo = candidato[1:-2]
+        valido = candidato[-1] == FRAME_END and (sum(corpo) & 0xFF) == candidato[-2]
 
-        if frame[-1] != FRAME_END:
-            continue  # frame corrompido, descarta e segue
-
-        corpo = frame[1:-2]
-        if (sum(corpo) & 0xFF) != frame[-2]:
-            print("  [aviso] checksum invalido, frame descartado")
+        if not valido:
+            if candidato[-1] == FRAME_END:
+                print("  [aviso] checksum invalido, frame descartado")
+            del buffer[0]  # descarta so o cabecalho falso, preserva o resto
             continue
 
-        frames.append(frame)
+        del buffer[:tam_total]
+        frames.append(candidato)
     return frames
 
 

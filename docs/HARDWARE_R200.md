@@ -3,6 +3,8 @@
 Documento de bancada para o projeto **patrimônio-inteligente**.
 Cobre desde o primeiro teste do módulo no PC até a ligação definitiva com o ESP32.
 
+**Onde isso se encaixa no repositório.** O firmware em `firmware/` hoje só simula o leitor: o comando BLE `LED_ON` acende o LED e devolve um texto fixo, fragmentado em pacotes de 20 bytes e fechado por `__END__` (`ble_service.cpp`). O aplicativo Android já interpreta o payload `codigo;descricao` (RN-03 da `docs/spec.md`, parser em `domain/InterpretadorPayloadUhf.kt`). A Fase 2 deste documento é o que faz o firmware trocar a simulação pelo R200 e emitir esse formato.
+
 ---
 
 ## 0. Regras que não se negociam
@@ -76,6 +78,15 @@ Só depois que a Fase 1 passar.
 
 UART2 a 115200 8N1.
 
+### O que o firmware da Fase 2 precisa entregar
+
+- Novo módulo `firmware/uhf_r200.h/.cpp`: montagem de frame, parser (o mesmo do `teste_r200.py`) e controle de inventário sobre `Serial2` a 115200.
+- `ble_service.cpp` sem bloqueio: o comando BLE só muda um estado; quem lê a UART e envia pelo BLE é o `loop()`. Hoje o `onWrite` faz `delay(800)` e envia dentro do callback, o que não serve para leitura contínua.
+- Comandos `SCAN_START`/`SCAN_STOP`, mantendo `LED_ON`/`LED_OFF` como sinônimos até o aplicativo ser atualizado.
+- Payload BLE no formato da RN-03: **`EPC;`** (código = EPC em hexadecimal maiúsculo, descrição vazia). O RSSI vai só para o log serial do ESP32; se um dia entrar no aplicativo, será campo próprio, não texto na descrição. Fragmentação em 20 bytes e `__END__` continuam, porque `EPC;` com 24 caracteres já passa do limite.
+- Janela de silêncio por EPC no firmware: o R200 notifica a mesma tag dezenas de vezes por segundo e cada envio BLE fragmentado custa cerca de 150 ms. Sem isso o BLE afoga.
+- LED aceso enquanto o inventário está ativo.
+
 ### Cuidado com a UART compartilhada
 
 Verificar se o micro-USB da placa e o header de pinos usam a **mesma** UART do R200. Se usarem — que é o caso mais comum nessas placas:
@@ -124,7 +135,7 @@ BB 02 22 [LenMSB] [LenLSB] [RSSI] [PC:2] [EPC:n] [CRC:2] [Checksum] 7E
 `RSSI` é byte com sinal (valor > 127 → subtrair 256).
 O EPC começa após o PC de 2 bytes e termina 2 bytes antes do fim dos parâmetros (o CRC não faz parte do EPC).
 
-Esse é o mesmo parser que está em `uhf_r200.cpp`. Se funciona no Python, funciona no ESP32.
+Este é o parser do `teste_r200.py`, a portar para `firmware/uhf_r200.cpp` na Fase 2. Se funciona no Python, funciona no ESP32. Detalhe que importa nos dois: `0xBB` pode aparecer dentro do EPC ou do RSSI, então nada é descartado antes de validar tamanho, `0x7E` e checksum do frame inteiro; frame inválido descarta só um byte e procura o próximo `0xBB`.
 
 ---
 
@@ -151,7 +162,7 @@ Para bancada com potência baixa é o caminho normal. **Para o sistema em produ�
 |---|---|
 | Porta não aparece na listagem | Driver do conversor USB (CH340 ou CP2102). É o mesmo do ESP32 — checar no Gerenciador de Dispositivos. |
 | Porta abre mas `RX: (sem resposta)` | Baud errado (deve ser 115200); ou cabo USB só de carga, sem linhas de dados. Testar outro cabo. |
-| `[aviso] checksum inválido` | Ruído na linha, cabo longo demais, ou disputa de UART (USB + ESP32 ao mesmo tempo). |
+| `[aviso] checksum inválido` | Ruído na linha, cabo longo demais, ou disputa de UART (USB + ESP32 ao mesmo tempo). Um aviso isolado no meio de leituras boas é normal: o parser se ressincroniza sozinho. |
 | Responde a comandos mas não lê tag | Antena mal rosqueada; potência baixa demais; tag encostada em metal sem ser anti-metal; distância. Começar com a tag a 5–10 cm. |
 | Módulo reinicia durante o inventário | Alimentação insuficiente — pico de TX. Fonte externa, contato firme no VCC/GND. |
 
@@ -160,7 +171,7 @@ Para bancada com potência baixa é o caminho normal. **Para o sistema em produ�
 ## 7. Próximos passos
 
 - [ ] Fase 1 concluída — módulo responde e lê tag
-- [ ] Fase 2 — ESP32 lendo via UART2, saída BLE em `epcHex;rssi=X`
+- [ ] Fase 2 — ESP32 lendo via UART2, saída BLE `EPC;` (RN-03), RSSI no log serial
 - [ ] Testar tags ABS anti-metal em superfície metálica real (datasheet não substitui teste físico)
 - [ ] Comparar alcance Higgs3 adesiva vs. ABS anti-metal, em papel e em metal
 - [ ] Levantar curva de potência × alcance (18 / 20 / 22 / 26 dBm)
