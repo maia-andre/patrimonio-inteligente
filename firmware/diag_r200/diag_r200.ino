@@ -8,7 +8,9 @@
 //
 // Como ler:
 //   RX2 em repouso = 1  -> o TXD do R200 esta ligado e o modulo esta ligado
-//   RX2 em repouso = 0  -> fio TXD solto, trocado, ou modulo sem energia
+//                          (pull-up interno desligado, entao e prova real)
+//   RX2 em repouso = 0  -> fio TXD solto, sem contato no furo, trocado,
+//                          ou modulo sem energia
 //   resposta BB 01 03 ... -> UART funcionando nos dois sentidos
 //   nenhuma resposta com RX2 = 1 -> o R200 nao esta recebendo: RXD solto,
 //                                    trocado, ou a linha presa pelo CH340
@@ -16,6 +18,7 @@
 // Ligacao: docs/HARDWARE_R200.md, secao 3.
 
 #include <Arduino.h>
+#include <driver/gpio.h>
 
 static const uint32_t BAUD = 115200;
 static const int PINO_RX2 = 16;
@@ -28,6 +31,11 @@ static const uint8_t CMD_VERSAO_HW[] = {0xBB, 0x00, 0x03, 0x00, 0x01, 0x00, 0x04
 void setup() {
     Serial.begin(BAUD);
     Serial2.begin(BAUD, SERIAL_8N1, PINO_RX2, PINO_TX2);
+    // O driver da UART liga um pull-up interno no RX2, que sozinho ja daria
+    // "repouso = 1" com o fio solto. Troca por pull-down fraco: agora so le 1
+    // se o TXD do R200 estiver de fato segurando a linha em nivel alto.
+    gpio_pullup_dis((gpio_num_t)PINO_RX2);
+    gpio_pulldown_en((gpio_num_t)PINO_RX2);
     pinMode(PINO_LED, OUTPUT);
     delay(500);
     Serial.println();
