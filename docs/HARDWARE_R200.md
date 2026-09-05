@@ -79,16 +79,37 @@ Três saídas, em ordem de preferência:
 
 Só depois que a Fase 1 passar.
 
+### O que a placa tem (conferido em foto, 05/09/2026)
+
+A placa vem **sem pinos soldados**. Dois grupos de furos importam:
+
+- **`J3`**, na borda direita, 4 furos em coluna, de cima para baixo: `3V3`, `RXD`, `TXD`, `GND` (o furo quadrado é o `GND`). É a UART do módulo, em nível 3,3 V, o mesmo do ESP32: liga direto, sem conversor de nível. Os resistores `R14`/`R15` ao lado devem ser os de série que separam essa UART do CH340, mas isso é suposição, não foi medido.
+- Fileira de 5 furos à esquerda do módulo blindado, ao lado da serigrafia `YPD-R200`, com um furo marcado **`5V`**. É a entrada de 5 V que alimenta o regulador da placa, o mesmo caminho do micro-USB.
+
+O micro-USB, o CH340 e o `J3` compartilham a única UART do módulo. Portanto: USB do R200 desconectado enquanto o ESP32 estiver no `J3`.
+
+Para pôr pinos: cortar 4 posições da barra de pinos em L e soldar em `J3`, mais 1 pino reto no furo `5V`. Sem ferro de solda, pino encaixado e inclinado no furo serve para os comandos de versão, que puxam pouca corrente; para inventário o contato precisa ser firme.
+
 ### Pinagem
 
-| R200 | ESP32 | Observação |
+| R200 | ESP32 DevKit V1 (30 pinos) | Observação |
 |---|---|---|
-| `TXD` | `GPIO16` (RX2) | dados do R200 para o ESP32 |
-| `RXD` | `GPIO17` (TX2) | dados do ESP32 para o R200 |
-| `GND` | `GND` | obrigatório, terra comum com a fonte |
-| `5V` | — | fonte externa 5 V, **não** o ESP32 |
+| `J3 TXD` | `RX2` (GPIO16) | dados do R200 para o ESP32 |
+| `J3 RXD` | `TX2` (GPIO17) | dados do ESP32 para o R200 |
+| `J3 GND` | `GND` | obrigatório, terra comum com a fonte |
+| `5V` (fileira da esquerda) | `VIN` ou fonte externa 5 V | ver abaixo; **nunca** o `3V3` do ESP32 |
+
+No ESP32 DevKit V1 os pinos `RX2` e `TX2` estão serigrafados na coluna da direita; `VIN` e `GND` ficam na ponta inferior da coluna da esquerda, junto do micro-USB.
 
 UART2 a 115200 8N1.
+
+### Alimentação do R200
+
+Por ordem de preferência:
+
+1. **Fonte externa 5 V no furo `5V`**: carregador de celular ou power bank com cabo USB cortado (vermelho = 5 V, preto = GND). É o que aguenta os picos de transmissão. O GND dessa fonte precisa estar no GND do ESP32, o que o fio `J3 GND` já garante.
+2. **`VIN` do ESP32 no furo `5V`**: os 5 V da USB do PC passam pelo ESP32 e alimentam o R200. Uma porta USB 3 dá até 900 mA; a ponte serial não liga o rádio do ESP32, então a maior parte sobra para o R200. Em 18 dBm tende a funcionar. Se o módulo reiniciar no meio do inventário, é falta de corrente: voltar à opção 1.
+3. **Micro-USB do R200 em carregador ou power bank, nunca em computador**: alimenta pelo conector, sem pino de força. Como o CH340 acorda junto e segura a linha `RXD` em repouso, só é aceitável se `R14`/`R15` forem mesmo resistores em série. Último recurso.
 
 ### O que o firmware da Fase 2 precisa entregar
 
