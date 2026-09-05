@@ -73,8 +73,8 @@ graph LR
         TAG["🏷️ Etiquetas RFID UHF<br/>passivas nos bens"]
         BAR["🏷️ Código de barras<br/>na plaqueta"]
         NTAG["🏷️ Etiqueta NFC<br/>no bem"]
-        LEITOR["📡 Módulo leitor UHF<br/>(YRM100)"]
-        TAG -.->|"rádio 865-928 MHz<br/>até ~6 m"| LEITOR
+        LEITOR["📡 Módulo leitor UHF<br/>(YPD-R200 · Impinj E710)"]
+        TAG -.->|"rádio 902-928 MHz<br/>até ~6 m"| LEITOR
     end
 
     subgraph Embarcado["🔌 ESP32 DevKit V1"]
@@ -154,22 +154,23 @@ No modo código de barras são aceitos **Code 128, Code 39 e QR Code** — EAN e
 | Leitura por NFC | ✅ **Funciona** | Reader mode NfcA/B/F/V; código via registro NDEF de texto ou UID |
 | Lançamento manual de código | ✅ **Funciona** | Campo de texto para o bem sem etiqueta legível; mesma lista e deduplicação |
 | Fluxo de leitura patrimonial | 🟡 **Simulado** | O ESP32 devolve um registro patrimonial fictício após 800 ms |
-| Leitura de tag RFID UHF real | ❌ **Não existe** | **Bloqueado: falta adquirir o módulo leitor** |
+| Módulo leitor UHF na bancada | 🟡 **Em validação** | YPD-R200 (Impinj E710) recebido em 05/09/2026; ligado ao ESP32 por UART e alimentado por ele, o módulo liga e responde, mas os pinos sem solda deformam a conversa — solda pendente. Registro em [`docs/HARDWARE_R200.md`](docs/HARDWARE_R200.md) |
+| Leitura de tag RFID UHF real | ❌ **Não existe** | Próximo passo após a solda: o firmware ainda não fala com o módulo |
 | Persistência local (histórico) | ❌ **Não existe** | Planejado com Room |
 | Integração com sistema de patrimônio | ❌ **Não existe** | Depende de API do sistema municipal |
 | Camada de IA (reconciliação, anomalias) | ❌ **Não existe** | Especificada em [Onde entra a IA](#-onde-entra-a-inteligência-artificial) |
 
 ### O que exatamente está simulado
 
-Como a compra do módulo leitor ainda não foi liberada, implementamos o **fluxo completo com o hardware que já tínhamos**. Ao acionar "Escanear", o ESP32 acende o LED (simulando a antena UHF ativa), aguarda 800 ms (simulando o tempo de leitura) e transmite via BLE um registro patrimonial fictício, que o app remonta e exibe na tela.
+Enquanto o módulo leitor não existia, implementamos o **fluxo completo com o hardware que já tínhamos**. Ao acionar "Escanear", o ESP32 acende o LED (simulando a antena UHF ativa), aguarda 800 ms (simulando o tempo de leitura) e transmite via BLE um registro patrimonial fictício, que o app remonta e exibe na tela. Esse é o firmware que está no repositório hoje.
 
-Isso significa que **toda a espinha dorsal — captura, transporte, fragmentação, remontagem e exibição — está construída e validada**. O que falta é substituir a string fictícia pelo EPC real vindo da antena. É uma troca de origem de dado, não uma reescrita.
+Isso significa que **toda a espinha dorsal — captura, transporte, fragmentação, remontagem e exibição — está construída e validada**. O que falta é substituir a string fictícia pelo EPC real vindo da antena. É uma troca de origem de dado, não uma reescrita — e o módulo que fornece esse dado chegou à bancada em 05/09/2026.
 
 > ### 🚧 O gargalo, dito com todas as letras
 >
-> O **modo RFID UHF** — e apenas ele — está travado por uma compra de aproximadamente **R$ 1.200**. Não é um problema técnico — é um trâmite administrativo. Enquanto isso, os modos **código de barras e NFC funcionam hoje, sem hardware nenhum**, e o firmware que conversaria com o leitor está escrito e esperando.
+> Até setembro de 2026 o **modo RFID UHF** — e apenas ele — estava travado pela aquisição do módulo leitor, cerca de **R$ 1.200** de bancada. O módulo (YPD-R200) chegou em 05/09/2026 e já conversa com o ESP32 pela UART; falta soldar os pinos, confirmar a velocidade da serial e trocar a simulação do firmware pela leitura real. A partir daqui o gargalo é **tempo de bancada**, não compra.
 >
-> **Se o seu órgão já tem um leitor UHF na gaveta, você pode nos ajudar a destravar o modo UHF em uma tarde.** Veja [Procuram-se parceiros](#-procuram-se-parceiros).
+> Os modos **código de barras e NFC funcionam hoje, sem hardware nenhum**. E se o seu órgão já tem um leitor UHF de outro modelo, o relato comparativo vale muito — veja [Procuram-se parceiros](#-procuram-se-parceiros).
 
 ---
 
@@ -231,23 +232,29 @@ A lista de materiais abaixo vale **só para o modo RFID UHF**. Para conhecer o f
 | Item | Função | Custo estimado |
 |---|---|---|
 | ESP32 DevKit V1 | Microcontrolador com BLE nativo | ~R$ 50 |
-| Módulo leitor RFID UHF **YRM100** | Antena e rádio UHF | ~R$ 600 |
-| Lote de etiquetas UHF para teste | Tags passivas EPC Gen2 | ~R$ 200 |
-| Fonte externa 5V + acessórios | Alimentação do módulo | ~R$ 400 |
+| Módulo leitor RFID UHF **YPD-R200** (Impinj E710) + antena | Rádio UHF, conector SMA, antena cerâmica ou de painel | ~R$ 600 |
+| Lote de etiquetas UHF para teste | Tags passivas EPC Gen2: Higgs3 adesivas e ABS anti-metal | ~R$ 200 |
+| Fonte externa 5V + acessórios | Alimentação do módulo, protoboard, barras de pinos, jumpers | ~R$ 400 |
 | Smartphone Android 9+ (API 28) | Executa o app | Já disponível na maioria dos setores |
 
 > **Sobre o custo do módulo:** o preço varia bastante conforme a origem — importação direta sai consideravelmente mais barata que aquisição por fornecedor nacional dentro de processo formal de compra, onde incidem impostos e intermediação. Adotamos **~R$ 600** como referência de compra institucional. **Orce conforme a sua realidade de aquisição** — a bancada completa de validação fica em torno de **R$ 1.200**.
 
-**Especificações do YRM100:** protocolo EPCglobal UHF Class 1 Gen 2 / ISO 18000-6C · frequência 865–868 MHz (EU) ou 902–928 MHz (US) · alcance 0–6 m conforme antena, tag e ambiente · alimentação 3,7–5 V · potência RF ajustável 15–26 dBm · comunicação UART.
+**Especificações do YPD-R200:** chip Impinj E710 · protocolo EPCglobal UHF Class 1 Gen 2 / ISO 18000-6C · região configurável, usamos 902–928 MHz (US), que cobre as faixas liberadas pela ANATEL · alcance 0–6 m conforme antena, tag e ambiente · alimentação 5 V · potência RF ajustável 15–26 dBm · UART em 3,3 V, protocolo de frames MagicRF (`BB ... 7E`) · micro-USB com conversor CH340 embutido. Montagem, pinagem, protocolo e diagnóstico estão em [`docs/HARDWARE_R200.md`](docs/HARDWARE_R200.md).
 
-> ⚠️ **Alimentação:** o YRM100 consome picos de 200–260 mA. **Não alimente pelo pino 3.3V/5V do ESP32.** Use fonte externa de 5 V com GND compartilhado, sob pena de resets e leituras erráticas.
+> ⚠️ **Alimentação:** o R200 puxa picos acima de 500 mA na transmissão. **Nunca pelo pino 3.3V do ESP32.** Na bancada, o pino `VIN` do ESP32 (5 V da USB) sustentou o módulo nos testes de comando; para inventário contínuo, fonte externa de 5 V com GND compartilhado. E **antena conectada antes de energizar**, sempre: transmitir sem carga pode queimar o amplificador.
+
+> ⚠️ **Pinos:** a placa do R200 vem sem pinos. **Solde-os.** Pino apenas encaixado no furo alimenta a placa, mas não sustenta a UART — aprendemos isso em uma tarde inteira de bancada.
+
+> 💡 **Windows sem administrador:** o CH340 do R200 exige driver de fabricante e o Windows não o traz sozinho. O ESP32 DevKit (CH9102) usa o driver embutido. A saída é gravar `firmware/ponte_uart` no ESP32 e falar com o R200 através dele — detalhes na seção 2b do documento do hardware.
 
 ### Firmware (ESP32)
 
-1. Instale a **Arduino IDE** e o suporte a placas ESP32.
+1. Instale a **Arduino IDE** e o suporte a placas ESP32 (core `esp32` 3.x).
 2. Abra `firmware/firmware.ino` — os arquivos `.h`/`.cpp` do diretório são carregados automaticamente.
-3. Selecione a placa **ESP32 Dev Module** e a porta serial correspondente.
+3. Selecione a placa **DOIT ESP32 DEVKIT V1** e a porta serial correspondente.
 4. Compile e grave. Abra o Serial Monitor em **115200 baud** para acompanhar os logs.
+
+Ferramentas de bancada do módulo UHF, à parte do firmware: `firmware/teste_r200.py` (PC, exercita o protocolo do R200), `firmware/ponte_uart/` (ESP32 como conversor USB-serial) e `firmware/diag_r200/` (ESP32 testa a UART do R200 sozinho, varrendo velocidades). Uso descrito em [`docs/HARDWARE_R200.md`](docs/HARDWARE_R200.md).
 
 ```
 [BOOT] ESP32 iniciado
@@ -339,12 +346,12 @@ graph LR
     style F1 fill:#fef3c7,stroke:#b45309,stroke-width:3px
 ```
 
-**📍 Estamos aqui:** entre validar e pilotar — com a base tecnológica construída e aguardando o componente final.
+**📍 Estamos aqui:** validando — a base tecnológica está construída e o módulo leitor está na bancada, ligado ao ESP32, na etapa de montagem física.
 
 <details>
 <summary><b>Detalhamento das tarefas por horizonte</b></summary>
 
-**Curto prazo — enquanto o hardware não chega**
+**Curto prazo — aplicativo e firmware**
 - [x] Modos de captura sem hardware: código de barras (CameraX + ZXing) e NFC (reader mode)
 - [x] Camada de domínio com porta única de captura, ViewModel e lista de inventário com deduplicação e contador
 - [x] Payload estruturado `codigo;descricao` aceito no lado do aplicativo (parser tolerante aos dois formatos)
@@ -353,11 +360,13 @@ graph LR
 - [ ] Renomear comandos BLE (`SCAN_START`/`SCAN_STOP`) e emitir o payload estruturado no firmware
 - [ ] Refatorar a UI de painel de botões para tela de auditoria e inventário
 
-**Médio prazo — após aquisição do YRM100**
-- [ ] Conectar o YRM100 ao ESP32 via UART com fonte externa 5 V
-- [ ] Implementar os comandos HEX de inventário do módulo no firmware
-- [ ] Substituir a mensagem simulada pelo EPC real lido da tag
-- [ ] Caracterizar leitura a diferentes distâncias, ângulos e materiais (metal e líquido degradam UHF)
+**Médio prazo — com o YPD-R200 na bancada (recebido em 05/09/2026)**
+- [x] Ligar o R200 ao ESP32 via UART2: fiação validada, módulo liga e responde
+- [ ] Soldar os pinos do R200 e confirmar a velocidade da UART com o `diag_r200`
+- [ ] Ler a primeira tag pelo `teste_r200.py` através da ponte serial
+- [ ] Implementar os comandos de inventário do módulo no firmware (`uhf_r200.cpp`)
+- [ ] Substituir a mensagem simulada pelo EPC real lido da tag, no formato `EPC;`
+- [ ] Caracterizar leitura a diferentes distâncias, ângulos e materiais (metal e líquido degradam UHF); comparar Higgs3 adesiva e ABS anti-metal
 
 **Longo prazo — produção**
 - [ ] Avaliar módulo industrial (JRD4035 ou superior) para anti-colisão em massa
@@ -376,7 +385,7 @@ Este projeto vale muito mais integrado do que replicado. Se qualquer um dos iten
 
 | Se você... | O que podemos fazer juntos |
 |---|---|
-| 🔬 **Já tem um leitor UHF** em outro órgão | Rodar nosso firmware no seu hardware e destravar a validação que está parada por uma compra |
+| 🔬 **Já tem um leitor UHF** em outro órgão | Comparar alcance e comportamento com o nosso R200, ou portar o firmware para o seu módulo — o protocolo está documentado |
 | 🏛️ **Enfrenta a mesma dor** em outro município | Adotar, adaptar e nos contar o que quebrou — o aprendizado de campo é o ativo mais escasso aqui |
 | 💻 **Desenvolve** (Kotlin, C++, dados, IA) | Pegar qualquer item do roadmap; a camada de IA está especificada e livre |
 | 📊 **Trabalha com patrimônio ou contabilidade pública** | Revisar o modelo de dados, a aderência ao MCASP e o fluxo de reconciliação |

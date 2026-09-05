@@ -10,9 +10,9 @@ Antes de qualquer coisa: **você não precisa escrever código para contribuir.*
 
 ### 1. 🔬 Acesso a um leitor RFID UHF
 
-O **modo RFID UHF** — o único capaz de inventário em massa — está bloqueado por uma compra de aproximadamente R$ 1.200 travada em trâmite administrativo. O firmware que conversaria com o módulo YRM100 já está escrito. Os modos código de barras e NFC funcionam sem esse hardware, então dá para contribuir hoje com qualquer Android — mas eles não substituem o UHF, e o pedido abaixo segue válido e prioritário.
+O **modo RFID UHF** — o único capaz de inventário em massa — ficou bloqueado até setembro de 2026 pela aquisição do módulo leitor. O módulo YPD-R200 chegou à bancada em 05/09/2026 e já conversa com o ESP32 pela UART; o firmware que lê tags de verdade é o próximo trabalho (veja [`docs/HARDWARE_R200.md`](docs/HARDWARE_R200.md)). Os modos código de barras e NFC funcionam sem esse hardware, então dá para contribuir hoje com qualquer Android — mas eles não substituem o UHF.
 
-Se o seu órgão, universidade ou empresa já tem um leitor UHF disponível, **você pode destravar o modo UHF em uma tarde**. [Abra uma issue](../../issues/new) contando qual módulo você tem e ajudamos a rodar.
+Se o seu órgão, universidade ou empresa tem um leitor UHF de outro modelo, o pedido continua valendo, agora por outro motivo: **comparar**. Alcance, taxa de leitura e comportamento em metal variam muito entre módulos e antenas, e um segundo leitor na conversa vale mais que qualquer datasheet. [Abra uma issue](../../issues/new) contando qual módulo você tem.
 
 ### 2. 📋 Relatos de campo — inclusive de fracasso
 
@@ -34,7 +34,7 @@ Estamos formalizando a autorização institucional de publicação (veja [NOTICE
 
 ### 5. 💻 Código
 
-Veja o [roadmap no README](README.md#️-roadmap). Itens de curto prazo não dependem do hardware bloqueado e podem ser tocados imediatamente. A camada de IA está especificada e completamente livre.
+Veja o [roadmap no README](README.md#️-roadmap). Itens de curto prazo não dependem do módulo UHF e podem ser tocados imediatamente. A camada de IA está especificada e completamente livre.
 
 ---
 
