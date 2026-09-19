@@ -199,11 +199,24 @@ def varrer_baud(porta: str):
     certa devolve algo como  BB 01 03 ... 7E.
     """
     print(f"Varrendo velocidades em {porta}...\n")
+    print(f"  espera de boot: {ESPERA_BOOT} s por velocidade")
+    print(f"  candidatas: {BAUDS_CANDIDATOS}")
+    print(f"  previsao: cerca de {len(BAUDS_CANDIDATOS) * (ESPERA_BOOT + 1.0):.0f} s")
+    print()
+
     achadas = []
+    comecou = time.time()
 
     for baud in BAUDS_CANDIDATOS:
         try:
             with abrir_porta(porta, baud) as ser:
+                # Se uma sessao anterior morreu no meio de um inventario
+                # continuo, o modulo ainda esta despejando notificacao de tag e
+                # a resposta da versao se perde no meio. Parar antes de perguntar.
+                ser.write(CMD_PARAR)
+                time.sleep(0.3)
+                ser.reset_input_buffer()
+
                 ser.write(CMD_INFO(0x00))
                 time.sleep(0.6)
                 resposta = ser.read(ser.in_waiting or 1)
@@ -223,6 +236,8 @@ def varrer_baud(porta: str):
             amostra = resposta[:16].hex(" ").upper()
             print(f"  {baud:>6} baud : {len(resposta)} bytes sem frame valido   {amostra}")
 
+    print()
+    print(f"(varredura levou {time.time() - comecou:.1f} s)")
     print()
     if len(achadas) == 1:
         baud = achadas[0]
