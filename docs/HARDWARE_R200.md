@@ -273,7 +273,7 @@ Para bancada com potência baixa é o caminho normal. **Para o sistema em produ�
 | Módulo reinicia durante o inventário | Alimentação insuficiente — pico de TX. Fonte externa, contato firme no VCC/GND. |
 | `diag_r200`: `RX2 em repouso` alterna entre `0` e `1` de uma linha para outra | Contato do `TXD` indo e vindo. Pino sem solda. |
 | `diag_r200`: respostas só com bytes como `00 00 00 80 C0 E0 F0 FC FE`, em todas as velocidades | Não é velocidade errada: é linha que fica em baixo e sobe devagar, assinatura de contato resistivo. Pino sem solda. Velocidade errada dá lixo diferente, e em uma das velocidades o frame sai limpo. |
-| Porta abre, `(sem resposta)` em **todas** as velocidades, e o módulo **bipa quando o script fecha a porta** | `DTR`/`RTS` mantêm o módulo em reset. O pyserial levanta as duas ao abrir a porta; se elas chegam ao reset do módulo, ele fica parado enquanto a porta estiver aberta e só dá o bipe de boot quando o script solta as linhas ao sair. Velocidade errada dá lixo, não silêncio — silêncio em todas aponta para cá. O `teste_r200.py` passou a soltar as duas na abertura (`abrir_porta`); `--diagnostico` testa as quatro combinações. |
+| Porta abre, `(sem resposta)` em **todas** as velocidades, e o módulo **bipa pouco depois de cada abertura de porta** | Abrir a porta reinicia o módulo, e o comando está sendo enviado em cima do boot. O bipe é de boot, não de leitura de tag: repete-se no mesmo instante em toda velocidade, enquanto leitura de tag dependeria do baud certo. Velocidade errada dá lixo, não silêncio — silêncio em **todas** não é problema de baud. O `abrir_porta()` do `teste_r200.py` espera `ESPERA_BOOT` (2,5 s) antes de qualquer comando. |
 | Monitor serial cheio de caracteres estranhos | Velocidade do monitor diferente de 115200, ou a placa está com o `ponte_uart` (que repassa bytes binários crus) em vez do `diag_r200`. |
 
 ---
@@ -301,6 +301,30 @@ O que ficou provado:
 - O módulo reage ao comando quando o `RXD` encosta: chegaram respostas de 10 a 54 bytes, mas deformadas (`00 80 C0 E0 F0 FC FE`) em todas as velocidades, e `RX2 em repouso` alternando `0`/`1`. Diagnóstico: contato resistivo dos pinos sem solda nos furos.
 
 O que não ficou provado: a velocidade da UART do módulo e a leitura de uma tag. Os dois dependem do contato firme.
+
+## 8b. Registro de bancada — 19/09/2026 (Debian, micro-USB)
+
+Notebook Debian 13 em modo texto, R200 ligado só pelo micro-USB da própria placa,
+fora da protoboard, antena de painel no `CON1`. Sem solda, sem ESP32, sem `J3`.
+
+O que ficou provado:
+
+- O Debian reconhece o CH340 nativamente: `/dev/ttyUSB0`, `1A86:7523`. **O micro-USB
+  do R200 é um caminho viável** — não precisa de driver, de solda nem de ponte serial.
+- **Abrir a porta reinicia o módulo.** O buzzer bipa sempre no mesmo instante depois da
+  abertura, igual em toda velocidade. Comando mandado antes disso se perde no boot: foi
+  a causa de toda a sessão de `(sem resposta)` do dia, e não velocidade, `DTR`/`RTS` ou
+  `R14`/`R15` isolando a UART — hipóteses levantadas e descartadas nesta ordem.
+- **O caminho de volta existe**: voltaram bytes (1 a 9600, 2 a 19200) no modo `--cego`,
+  poucos e deformados, que é a assinatura de escutar a 9600 um módulo que fala mais rápido.
+- `R11`, `R12`, `R4` (perto do `CON1`) e `R15`, `R16` (perto do `J3`) têm componente.
+
+Erros de instrução corrigidos no caminho: `dmesg` exige privilégio no Debian 12+
+(`kernel.dmesg_restrict=1`), e `su -c` sem o traço não carrega o `PATH` do root, então
+`usermod` "não existe".
+
+O que não ficou provado: a velocidade da UART e a leitura de uma tag — as duas ficaram
+para a primeira varredura feita já com a espera de boot.
 
 ## 9. Próximos passos
 

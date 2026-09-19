@@ -32,6 +32,7 @@ except ImportError:
 
 BAUD_PADRAO = 115200
 BAUDS_CANDIDATOS = [9600, 19200, 38400, 57600, 115200, 230400]
+ESPERA_BOOT = 2.5  # s -- abrir a porta reinicia o modulo; ver abrir_porta()
 
 # ---------------------------------------------------------------- protocolo
 # Estrutura do frame MagicRF:
@@ -66,7 +67,8 @@ REGIOES = {"china900": 0x01, "us": 0x02, "eu": 0x03, "china800": 0x04}
 
 # ---------------------------------------------------------------- porta
 def abrir_porta(porta: str, baud: int, timeout: float = 0.2,
-                dtr: bool = False, rts: bool = False):
+                dtr: bool = False, rts: bool = False,
+                espera_boot: float = ESPERA_BOOT):
     """Abre a serial com DTR/RTS no estado pedido, ja a partir da abertura.
 
     Por padrao o pyserial levanta as duas linhas ao abrir. Em placas que usam
@@ -77,6 +79,13 @@ def abrir_porta(porta: str, baud: int, timeout: float = 0.2,
 
     Definir os estados ANTES de open() evita o pulso da abertura; soltar as
     duas e inofensivo quando elas nao estao ligadas a nada.
+
+    E espera o boot. Em 19/09/2026 ficou provado que abrir a porta reinicia o
+    modulo: o buzzer deu bipe de boot sempre no mesmo instante depois da
+    abertura, identico em todas as velocidades -- se fosse leitura de tag
+    dependeria do baud certo e nao se repetiria igual. Comando enviado antes
+    disso chega durante o boot e se perde, que foi a causa real do
+    "(sem resposta)" em toda a varredura daquele dia.
     """
     ser = serial.Serial()
     ser.port = porta
@@ -85,6 +94,9 @@ def abrir_porta(porta: str, baud: int, timeout: float = 0.2,
     ser.dtr = dtr
     ser.rts = rts
     ser.open()
+    if espera_boot > 0:
+        time.sleep(espera_boot)
+        ser.reset_input_buffer()
     return ser
 
 
@@ -192,10 +204,8 @@ def varrer_baud(porta: str):
     for baud in BAUDS_CANDIDATOS:
         try:
             with abrir_porta(porta, baud) as ser:
-                time.sleep(0.3)
-                ser.reset_input_buffer()
                 ser.write(CMD_INFO(0x00))
-                time.sleep(0.4)
+                time.sleep(0.6)
                 resposta = ser.read(ser.in_waiting or 1)
         except serial.SerialException as erro:
             print(f"  {baud:>6} baud : erro ao abrir a porta ({erro})")
@@ -304,10 +314,8 @@ def diagnosticar(porta: str):
     for dtr, rts in COMBINACOES_CONTROLE:
         try:
             with abrir_porta(porta, BAUD_PADRAO, timeout=0.3, dtr=dtr, rts=rts) as ser:
-                time.sleep(0.4)
-                ser.reset_input_buffer()
                 ser.write(CMD_INFO(0x00))
-                time.sleep(0.5)
+                time.sleep(0.6)
                 resposta = ser.read(ser.in_waiting or 1)
         except serial.SerialException as erro:
             print(f"  DTR={dtr!s:<5} RTS={rts!s:<5} : erro ({erro})")
@@ -388,7 +396,6 @@ def inventario_cego(porta: str):
         print(f"--- {baud} baud ---")
         try:
             with abrir_porta(porta, baud) as ser:
-                time.sleep(0.3)
                 ser.write(CMD_SET_REGIAO(REGIOES["us"]))
                 time.sleep(0.2)
                 ser.write(CMD_SET_POTENCIA(1800))
@@ -462,10 +469,8 @@ def main():
     print(f"Abrindo {porta} a {baud} baud...")
 
     with abrir_porta(porta, baud) as ser:
-        # 2 s: se a porta for um ESP32 rodando ponte_uart.ino, abrir a porta
-        # reinicia a placa (DTR) e ela precisa desse tempo para voltar.
-        time.sleep(2.0)
-        ser.reset_input_buffer()
+        # abrir_porta ja esperou o boot -- do modulo, e tambem do ESP32 quando
+        # a porta for a da ponte serial.
 
         # 1) O modulo esta vivo?
         enviar(ser, CMD_INFO(0x00), "Versao de hardware")
