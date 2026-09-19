@@ -15,6 +15,7 @@ Uso:
     python teste_r200.py /dev/ttyUSB0 9600       # forca uma velocidade
     python teste_r200.py /dev/ttyUSB0 --diagnostico  # porta abre mas nada volta
     python teste_r200.py /dev/ttyUSB0 --cego         # nada volta: ouvir o buzzer
+    python teste_r200.py /dev/ttyUSB0 --eco          # loopback no J3
     python teste_r200.py /dev/ttyUSB0    # Linux
 
 ATENCAO: conecte a antena ANTES de energizar o modulo.
@@ -454,6 +455,87 @@ def inventario_cego(porta: str):
     print("  docs/HARDWARE_R200.md antes de desmontar a bancada.")
 
 
+# ---------------------------------------------------------------- eco
+PADRAO_ECO = bytes([0x55, 0xAA, 0x00, 0xFF, 0x0F, 0xF0, 0x33, 0xCC])
+
+
+def teste_eco(porta: str):
+    """Loopback no J3: o CH340 consegue escutar a si mesmo?
+
+    Serve para partir em dois o caso "a ida funciona e a volta nao". Com os
+    furos RXD e TXD do J3 em curto, o que o PC escreve tem que voltar.
+
+    Eco completo  -> PC <-> CH340 <-> J3 esta integro. O defeito esta do J3
+                     para dentro: a linha TXD do modulo nao chega ate ali.
+    Eco nenhum    -> o CH340 nao alcanca o J3. Os furos nao sao esse
+                     barramento, ou ha componente faltando no caminho.
+    Eco parcial   -> contato ruim no curto. Refazer com pressao firme.
+
+    Sem o curto, nada deve voltar. Se voltar, o que se ve nao e eco.
+    """
+    print("=" * 62)
+    print("TESTE DE ECO (loopback no J3)")
+    print("=" * 62)
+    print()
+    print("  Encoste algo metalico ligando os furos RXD e TXD do J3.")
+    print("  Fio descascado, clipe de papel, ponta de jumper -- serve qualquer")
+    print("  coisa que toque os dois ao mesmo tempo. Nao precisa de solda.")
+    print()
+    print("  Ordem dos furos no J3, de cima para baixo:  3V3  RXD  TXD  GND")
+    print("  (o furo quadrado e o GND)")
+    print()
+    print("  O modulo pode ficar ligado. Curto entre RXD e TXD nao danifica.")
+    print()
+
+    for rotulo, pedir in (("SEM o curto (controle)", False), ("COM o curto", True)):
+        print("-" * 62)
+        if pedir:
+            print(f"{rotulo}: faca o curto agora e segure.")
+        else:
+            print(f"{rotulo}: nao encoste em nada ainda.")
+        try:
+            input("  Enter quando estiver pronto... ")
+        except KeyboardInterrupt:
+            print()
+            print("  cancelado")
+            return
+
+        try:
+            with abrir_porta(porta, BAUD_PADRAO, timeout=0.5) as ser:
+                ser.reset_input_buffer()
+                ser.write(PADRAO_ECO)
+                time.sleep(0.6)
+                volta = ser.read(ser.in_waiting or 1)
+        except serial.SerialException as erro:
+            print(f"  erro na porta: {erro}")
+            return
+
+        enviado = PADRAO_ECO.hex(" ").upper()
+        print(f"  enviado : {enviado}")
+        if not volta:
+            print("  recebido: (nada)")
+        else:
+            print(f"  recebido: {volta.hex(' ').upper()}")
+
+        if pedir:
+            if volta == PADRAO_ECO:
+                print()
+                print("  ECO COMPLETO. O caminho PC <-> CH340 <-> J3 esta integro.")
+                print("  Logo, o defeito esta do J3 para dentro: o TXD do modulo")
+                print("  nao chega a esse barramento. Proximo passo e o J3 com")
+                print("  contato firme -- ou seja, solda.")
+            elif volta:
+                print()
+                print("  ECO PARCIAL. Quase certamente contato ruim no curto.")
+                print("  Refaca pressionando com firmeza e rode de novo.")
+            else:
+                print()
+                print("  SEM ECO. O CH340 nao alcanca esses furos. Ou o J3 nao e")
+                print("  o barramento do CH340, ou falta componente no caminho.")
+                print("  Nesse caso o micro-USB nunca vai conversar com o modulo.")
+        print()
+
+
 # ---------------------------------------------------------------- principal
 def main():
     if len(sys.argv) < 2:
@@ -472,6 +554,10 @@ def main():
 
     if len(sys.argv) > 2 and sys.argv[2] in ("--cego", "-c"):
         inventario_cego(porta)
+        return
+
+    if len(sys.argv) > 2 and sys.argv[2] in ("--eco", "-e"):
+        teste_eco(porta)
         return
 
     baud = BAUD_PADRAO
