@@ -69,7 +69,7 @@ O micro-USB do R200 tem um **CH340** (VID `1A86`, PID `7523`), que exige o drive
 
 O ESP32 DevKit **não** tem esse problema: seu conversor é um **CH9102** (PID `55D4`), que fala USB CDC e usa o driver `usbser` embutido no Windows. Foi assim que o ESP32 sempre funcionou sem administrador.
 
-Três saídas. Desde 19/09/2026 a **terceira é a preferida** (seção 2c), por dispensar solda e ESP32; as outras duas ficam registradas por servirem a situações diferentes:
+Três saídas. A terceira foi tentada a fundo em 19/09/2026 e **não funciona nesta placa** (ver seção 8b): o CH340 do R200 não entrega os dados do módulo ao PC. Ela fica registrada porque o diagnóstico tem valor, mas o caminho real é o primeiro:
 
 1. **ESP32 como ponte serial.** Gravar `firmware/ponte_uart/ponte_uart.ino` no ESP32 e ligar o R200 nos pinos conforme a seção 3, com o micro-USB do R200 **desconectado** e a alimentação vindo de fonte 5 V. O `teste_r200.py` roda sem alteração contra a porta do ESP32. Vantagem: já valida a fiação da Fase 2.
 2. **Celular Android com cabo OTG.** O aplicativo *Serial USB Terminal* (Kai Morich) fala com CH340 sem driver nem root; em modo hexadecimal dá para mandar os frames da seção 4 e ver a resposta. Serve para provar que o módulo está vivo.
@@ -80,8 +80,13 @@ Três saídas. Desde 19/09/2026 a **terceira é a preferida** (seção 2c), por 
 ### 2c. Roteiro no Debian sem interface gráfica
 
 Situação de 19/09/2026: notebook do serviço com Debian em modo texto, na tomada,
-com internet pelo roteador do celular. É a bancada preferencial enquanto não houver
-acesso a ferro de solda — o `J3` continua intocado.
+com internet pelo roteador do celular.
+
+> ⚠️ **Este roteiro não leva à leitura de tag nesta placa.** O Debian de fato reconhece o
+> CH340 sem driver, e isso resolveu o bloqueio que existia no Windows — mas o CH340 desta
+> placa não entrega os dados do módulo ao PC (seção 8b). O roteiro continua aqui porque a
+> preparação da máquina e as armadilhas do Debian valem para a bancada pela ponte do ESP32,
+> que é o caminho que funciona.
 
 **Preparar a máquina** (clone raso, para poupar o plano de dados):
 
@@ -323,8 +328,23 @@ Erros de instrução corrigidos no caminho: `dmesg` exige privilégio no Debian 
 (`kernel.dmesg_restrict=1`), e `su -c` sem o traço não carrega o `PATH` do root, então
 `usermod` "não existe".
 
-O que não ficou provado: a velocidade da UART e a leitura de uma tag — as duas ficaram
-para a primeira varredura feita já com a espera de boot.
+**Conclusão da sessão: o micro-USB do R200 não serve como caminho nesta placa.**
+
+O monitor cru (`--cru`), que não espera boot, não limpa buffer, não exige checksum e não
+para no primeiro punhado de bytes, viu **zero bytes em 15 s a 115200**. A 9600 veio um
+único `F0` — `11110000`, a mesma família de `00 80 C0 E0 F0 FC FE` da seção 6 — 1,5 s
+depois do comando, latência que não é de resposta. Byte solto que só aparece em baud baixo
+é assinatura de **entrada flutuante**: a 9600 a janela de amostragem é doze vezes mais
+longa e um transiente chega a formar caractere, a 115200 não. Ninguém está dirigindo o
+`RX` do CH340.
+
+A hipótese de filtro no software foi levantada pelo usuário e descartada por construção:
+o `--cru` não decide nada. No caminho, porém, ela achou dois defeitos reais nos scripts
+(buffer do boot descartado, leitura truncada no primeiro punhado) que teriam contaminado
+qualquer medição futura, inclusive pela ponte do ESP32.
+
+O que não ficou provado, e segue em aberto: a velocidade da UART e a leitura de uma tag.
+As duas dependem agora do `J3` com contato firme.
 
 ## 9. Próximos passos
 
