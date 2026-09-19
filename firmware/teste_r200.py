@@ -63,6 +63,30 @@ CMD_PARAR = montar_frame(0x00, 0x28)
 REGIOES = {"china900": 0x01, "us": 0x02, "eu": 0x03, "china800": 0x04}
 
 
+# ---------------------------------------------------------------- porta
+def abrir_porta(porta: str, baud: int, timeout: float = 0.2,
+                dtr: bool = False, rts: bool = False):
+    """Abre a serial com DTR/RTS no estado pedido, ja a partir da abertura.
+
+    Por padrao o pyserial levanta as duas linhas ao abrir. Em placas que usam
+    DTR ou RTS como reset -- o caso do R200 em 19/09/2026, que bipava de boot
+    justamente quando o script fechava a porta e soltava as linhas -- isso
+    mantem o modulo parado enquanto a porta estiver aberta, e o sintoma e
+    silencio em todas as velocidades.
+
+    Definir os estados ANTES de open() evita o pulso da abertura; soltar as
+    duas e inofensivo quando elas nao estao ligadas a nada.
+    """
+    ser = serial.Serial()
+    ser.port = porta
+    ser.baudrate = baud
+    ser.timeout = timeout
+    ser.dtr = dtr
+    ser.rts = rts
+    ser.open()
+    return ser
+
+
 # ---------------------------------------------------------------- parser
 # Maior frame que o modulo emite: notificacao de tag com EPC de ate 62 bytes
 # (RSSI 1 + PC 2 + EPC 62 + CRC 2 = 67 params). Acima disso e cabecalho falso.
@@ -166,7 +190,7 @@ def varrer_baud(porta: str):
 
     for baud in BAUDS_CANDIDATOS:
         try:
-            with serial.Serial(porta, baud, timeout=0.2) as ser:
+            with abrir_porta(porta, baud) as ser:
                 time.sleep(0.3)
                 ser.reset_input_buffer()
                 ser.write(CMD_INFO(0x00))
@@ -255,7 +279,7 @@ def diagnosticar(porta: str):
 
     espontaneos = b""
     try:
-        with serial.Serial(porta, BAUD_PADRAO, timeout=0.5) as ser:
+        with abrir_porta(porta, BAUD_PADRAO, timeout=0.5) as ser:
             fim = time.time() + 5.0
             while time.time() < fim:
                 espontaneos += ser.read(ser.in_waiting or 1)
@@ -278,9 +302,7 @@ def diagnosticar(porta: str):
     houve_resposta = False
     for dtr, rts in COMBINACOES_CONTROLE:
         try:
-            with serial.Serial(porta, BAUD_PADRAO, timeout=0.3) as ser:
-                ser.dtr = dtr
-                ser.rts = rts
+            with abrir_porta(porta, BAUD_PADRAO, timeout=0.3, dtr=dtr, rts=rts) as ser:
                 time.sleep(0.4)
                 ser.reset_input_buffer()
                 ser.write(CMD_INFO(0x00))
@@ -351,7 +373,7 @@ def main():
 
     print(f"Abrindo {porta} a {baud} baud...")
 
-    with serial.Serial(porta, baud, timeout=0.2) as ser:
+    with abrir_porta(porta, baud) as ser:
         # 2 s: se a porta for um ESP32 rodando ponte_uart.ino, abrir a porta
         # reinicia a placa (DTR) e ela precisa desse tempo para voltar.
         time.sleep(2.0)

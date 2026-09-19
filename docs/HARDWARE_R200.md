@@ -104,7 +104,14 @@ sudo usermod -aG dialout $USER
 O grupo só vale na sessão seguinte: saia e entre de novo, ou rode `newgrp dialout`.
 
 **Ligar o módulo.** Antena rosqueada **antes** de energizar. Micro-USB do R200 em porta
-direta do notebook, notebook na tomada. Então:
+direta do notebook, notebook na tomada.
+
+Tire a placa da protoboard: **nada no `J3` enquanto o micro-USB estiver em uso**, nem
+pinos soltos. Mesmo sem jumper ligado, pino em furo do `J3` vira toco flutuante na trilha
+da protoboard — capacitância e ruído numa UART que já está sob suspeita — e, se sobrar
+5 V em alguma trilha, a placa passa a ter duas fontes. Placa solta, só cabo e antena.
+
+Então:
 
 ```bash
 ls -l /dev/ttyUSB*
@@ -266,6 +273,7 @@ Para bancada com potência baixa é o caminho normal. **Para o sistema em produ�
 | Módulo reinicia durante o inventário | Alimentação insuficiente — pico de TX. Fonte externa, contato firme no VCC/GND. |
 | `diag_r200`: `RX2 em repouso` alterna entre `0` e `1` de uma linha para outra | Contato do `TXD` indo e vindo. Pino sem solda. |
 | `diag_r200`: respostas só com bytes como `00 00 00 80 C0 E0 F0 FC FE`, em todas as velocidades | Não é velocidade errada: é linha que fica em baixo e sobe devagar, assinatura de contato resistivo. Pino sem solda. Velocidade errada dá lixo diferente, e em uma das velocidades o frame sai limpo. |
+| Porta abre, `(sem resposta)` em **todas** as velocidades, e o módulo **bipa quando o script fecha a porta** | `DTR`/`RTS` mantêm o módulo em reset. O pyserial levanta as duas ao abrir a porta; se elas chegam ao reset do módulo, ele fica parado enquanto a porta estiver aberta e só dá o bipe de boot quando o script solta as linhas ao sair. Velocidade errada dá lixo, não silêncio — silêncio em todas aponta para cá. O `teste_r200.py` passou a soltar as duas na abertura (`abrir_porta`); `--diagnostico` testa as quatro combinações. |
 | Monitor serial cheio de caracteres estranhos | Velocidade do monitor diferente de 115200, ou a placa está com o `ponte_uart` (que repassa bytes binários crus) em vez do `diag_r200`. |
 
 ---
