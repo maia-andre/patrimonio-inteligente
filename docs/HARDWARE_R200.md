@@ -107,10 +107,19 @@ O grupo só vale na sessão seguinte: saia e entre de novo, ou rode `newgrp dial
 direta do notebook, notebook na tomada. Então:
 
 ```bash
-dmesg | tail
+ls -l /dev/ttyUSB*
 ```
 
-Esperado: `ch341-uart converter now attached to ttyUSB0`. Confirme com `ls -l /dev/ttyUSB*`.
+Apareceu `/dev/ttyUSB0`? Siga para a varredura. Se não apareceu, investigue:
+
+```bash
+lsusb                 # quer ver: 1a86:7523 QinHeng ... CH340  (pede usbutils)
+sudo dmesg | tail     # quer ver: ch341-uart ... attached to ttyUSB0
+```
+
+O `dmesg` **precisa de privilégio**: Debian 12 em diante traz `kernel.dmesg_restrict=1` e
+usuário comum recebe `read kernel buffer failed: Operation not permitted`. Isso não diz
+nada sobre o módulo — é só o kernel protegendo o próprio log.
 
 **Se o `ttyUSB0` aparecer e sumir em seguida**, o culpado é o `brltty` — o driver de
 display braile do Debian reivindica dispositivos CH341 e derruba a porta. Remover resolve:
