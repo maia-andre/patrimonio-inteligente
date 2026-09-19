@@ -69,11 +69,66 @@ O micro-USB do R200 tem um **CH340** (VID `1A86`, PID `7523`), que exige o drive
 
 O ESP32 DevKit **não** tem esse problema: seu conversor é um **CH9102** (PID `55D4`), que fala USB CDC e usa o driver `usbser` embutido no Windows. Foi assim que o ESP32 sempre funcionou sem administrador.
 
-Três saídas, em ordem de preferência:
+Três saídas. Desde 19/09/2026 a **terceira é a preferida** (seção 2c), por dispensar solda e ESP32; as outras duas ficam registradas por servirem a situações diferentes:
 
 1. **ESP32 como ponte serial.** Gravar `firmware/ponte_uart/ponte_uart.ino` no ESP32 e ligar o R200 nos pinos conforme a seção 3, com o micro-USB do R200 **desconectado** e a alimentação vindo de fonte 5 V. O `teste_r200.py` roda sem alteração contra a porta do ESP32. Vantagem: já valida a fiação da Fase 2.
 2. **Celular Android com cabo OTG.** O aplicativo *Serial USB Terminal* (Kai Morich) fala com CH340 sem driver nem root; em modo hexadecimal dá para mandar os frames da seção 4 e ver a resposta. Serve para provar que o módulo está vivo.
 3. **Notebook Linux.** O kernel reconhece o CH340 nativamente (`/dev/ttyUSB0`).
+    É o caminho mais curto: o micro-USB da placa já é um conector pronto, ligado à
+    mesma UART do módulo, e dispensa solda, jumper no `J3` e ESP32. Roteiro na seção 2c.
+
+### 2c. Roteiro no Debian sem interface gráfica
+
+Situação de 19/09/2026: notebook do serviço com Debian em modo texto, na tomada,
+com internet pelo roteador do celular. É a bancada preferencial enquanto não houver
+acesso a ferro de solda — o `J3` continua intocado.
+
+**Preparar a máquina** (clone raso, para poupar o plano de dados):
+
+```bash
+sudo apt update
+sudo apt install -y git python3-serial
+git clone --depth 1 https://github.com/maia-andre/patrimonio-inteligente.git
+cd patrimonio-inteligente/firmware
+```
+
+Use `python3-serial` do apt, **não** `pip install pyserial`: Debian 12 em diante recusa
+instalação global do pip (`externally-managed-environment`) e exige ambiente virtual.
+
+**Permissão da porta.** Sem isso, abrir a porta dá `Permission denied`:
+
+```bash
+sudo usermod -aG dialout $USER
+```
+
+O grupo só vale na sessão seguinte: saia e entre de novo, ou rode `newgrp dialout`.
+
+**Ligar o módulo.** Antena rosqueada **antes** de energizar. Micro-USB do R200 em porta
+direta do notebook, notebook na tomada. Então:
+
+```bash
+dmesg | tail
+```
+
+Esperado: `ch341-uart converter now attached to ttyUSB0`. Confirme com `ls -l /dev/ttyUSB*`.
+
+**Se o `ttyUSB0` aparecer e sumir em seguida**, o culpado é o `brltty` — o driver de
+display braile do Debian reivindica dispositivos CH341 e derruba a porta. Remover resolve:
+
+```bash
+sudo apt remove brltty
+```
+
+**Descobrir a velocidade e ler:**
+
+```bash
+python3 teste_r200.py                        # confere que a porta existe
+python3 teste_r200.py /dev/ttyUSB0 --varrer   # acha a velocidade da UART
+python3 teste_r200.py /dev/ttyUSB0 <baud>     # teste completo e inventário
+```
+
+Anotar a velocidade encontrada na seção 4 deste documento.
+
 
 ## 3. Fase 2 — ligação com o ESP32
 
@@ -145,7 +200,7 @@ BB | Type | Cmd | LenMSB | LenLSB | Params... | Checksum | 7E
 
 `Checksum` = soma dos bytes de `Type` até o último parâmetro, byte baixo.
 
-Velocidade: **115200 8N1 é a suposição de fábrica, ainda não confirmada** neste módulo. O `diag_r200.ino` varre 9600 a 230400 e mostra em qual delas volta um frame limpo `BB 01 03 ...`; anotar aqui quando confirmar.
+Velocidade: **115200 8N1 é a suposição de fábrica, ainda não confirmada** neste módulo. Duas ferramentas varrem 9600 a 230400 e mostram em qual delas volta um frame limpo `BB 01 03 ...`: `teste_r200.py PORTA --varrer`, do lado do PC, e o `diag_r200.ino`, quando o PC não alcança o módulo. Anotar aqui quando confirmar.
 
 ### Comandos usados no teste
 
@@ -210,7 +265,7 @@ Para bancada com potência baixa é o caminho normal. **Para o sistema em produ�
 
 | Ferramenta | Roda em | Para quê |
 |---|---|---|
-| `teste_r200.py` | PC, Python 3 + pyserial | Versão, região, potência, inventário único e contínuo com lista de EPCs. Funciona tanto pelo micro-USB do R200 (precisa do driver CH340) quanto pela porta do ESP32 com a ponte gravada. |
+| `teste_r200.py` | PC, Python 3 + pyserial | Versão, região, potência, inventário único e contínuo com lista de EPCs. Com `--varrer`, descobre a velocidade da UART antes de tudo; com um número como segundo argumento, força a velocidade. Funciona pelo micro-USB do R200 (nativo no Linux, driver CH340 no Windows) ou pela porta do ESP32 com a ponte gravada. |
 | `ponte_uart/ponte_uart.ino` | ESP32 | Repassa bytes USB ↔ UART2 sem interpretar. Faz o ESP32 de conversor USB-serial para o R200 quando o Windows não tem driver do CH340. |
 | `diag_r200/diag_r200.ino` | ESP32 | Sem PC no meio: manda a versão de hardware em cada velocidade de 9600 a 230400, em ciclo, e imprime no monitor serial o nível de repouso do `RX2` (pull-up interno desligado, então `1` é prova real) e os bytes que voltam. Para mexer nos fios com o monitor aberto e para descobrir a velocidade do módulo. |
 
@@ -232,9 +287,19 @@ O que não ficou provado: a velocidade da UART do módulo e a leitura de uma tag
 
 ## 9. Próximos passos
 
-- [ ] **Soldar** 4 pinos em `J3` e 1 pino no furo `5V` (casa, ferro de solda)
-- [ ] Gravar `diag_r200` e ler um ciclo: `RX2 em repouso = 1` fixo e o frame `BB 01 03 ...` limpo em uma velocidade. Anotar a velocidade na seção 4 e ajustar `BAUD` no `teste_r200.py` e no `ponte_uart.ino` se não for 115200
-- [ ] Gravar `ponte_uart` e rodar `teste_r200.py COM3`: versão, região, potência, inventário com uma tag Higgs3 a 5–10 cm
+**Pela bancada Debian (seção 2c) — não depende de solda:**
+
+- [ ] Preparar o notebook: `python3-serial`, clone raso, grupo `dialout`
+- [ ] Plugar o micro-USB do R200 e confirmar `ttyUSB0` no `dmesg` (se sumir, remover o `brltty`)
+- [ ] `teste_r200.py /dev/ttyUSB0 --varrer`: achar a velocidade da UART e anotar na seção 4
+- [ ] `teste_r200.py /dev/ttyUSB0 <baud>`: versão, região, potência, inventário com uma tag Higgs3 a 5–10 cm
+
+**Pelo ESP32 — depende de solda, e é o que leva ao aplicativo:**
+
+- [ ] **Soldar** 4 pinos em `J3` e 1 pino no furo `5V` (ferro de solda ou assistência técnica)
+- [ ] Gravar `diag_r200` e ler um ciclo: `RX2 em repouso = 1` fixo e o frame `BB 01 03 ...` limpo em uma velocidade
+- [ ] Ajustar `BAUD_PADRAO` no `teste_r200.py` e `BAUD` no `ponte_uart.ino` se a velocidade não for 115200
+- [ ] Gravar `ponte_uart` e repetir o inventário pela porta do ESP32
 - [ ] Fase 2 — firmware do projeto lendo o R200 via UART2, saída BLE `EPC;` (RN-03), RSSI no log serial
 - [ ] Testar tags ABS anti-metal em superfície metálica real (datasheet não substitui teste físico)
 - [ ] Comparar alcance Higgs3 adesiva vs. ABS anti-metal, em papel e em metal
