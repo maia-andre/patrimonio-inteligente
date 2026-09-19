@@ -14,6 +14,7 @@ Uso:
     python teste_r200.py /dev/ttyUSB0 --varrer   # descobre a velocidade da UART
     python teste_r200.py /dev/ttyUSB0 9600       # forca uma velocidade
     python teste_r200.py /dev/ttyUSB0 --diagnostico  # porta abre mas nada volta
+    python teste_r200.py /dev/ttyUSB0 --cego         # nada volta: ouvir o buzzer
     python teste_r200.py /dev/ttyUSB0    # Linux
 
 ATENCAO: conecte a antena ANTES de energizar o modulo.
@@ -348,6 +349,89 @@ def diagnosticar(porta: str):
     print("     enumerou, entao as linhas de dados funcionam.")
 
 
+# ---------------------------------------------------------------- cego
+JANELA_CEGA = 8  # segundos com a tag na antena, por velocidade
+
+
+def inventario_cego(porta: str):
+    """Testa o caminho PC -> modulo quando o caminho de volta esta mudo.
+
+    Situacao de 19/09/2026: modulo alimentado (LED verde), porta certa
+    (1A86:7523), comandos saindo, e nenhum byte voltando em nenhuma
+    velocidade nem em nenhum estado de DTR/RTS -- mas o modulo bipou. Se ele
+    recebe e nao responde, o defeito esta so na volta, e a unica prova
+    possivel e fisica: mandar inventario continuo e ouvir o buzzer enquanto
+    uma tag encosta na antena.
+
+    Nao le nada de volta de proposito. Quem observa e voce.
+    """
+    print("=" * 62)
+    print("INVENTARIO CEGO -- o script nao le resposta, voce escuta a placa")
+    print("=" * 62)
+    print()
+    print("  ANTENA ROSQUEADA? Este modo LIGA O RADIO de verdade.")
+    print("  Transmitir sem antena pode danificar o amplificador.")
+    print()
+    print("  Em cada velocidade o script manda regiao, potencia e inventario")
+    print(f"  continuo, espera {JANELA_CEGA} s e manda parar. Encoste a tag na antena")
+    print("  durante a contagem e anote em qual velocidade houve bipe ou LED.")
+    print()
+    try:
+        input("  Enter para comecar (Ctrl+C para sair)... ")
+    except KeyboardInterrupt:
+        print()
+        print("  cancelado")
+        return
+
+    for baud in BAUDS_CANDIDATOS:
+        print()
+        print(f"--- {baud} baud ---")
+        try:
+            with abrir_porta(porta, baud) as ser:
+                time.sleep(0.3)
+                ser.write(CMD_SET_REGIAO(REGIOES["us"]))
+                time.sleep(0.2)
+                ser.write(CMD_SET_POTENCIA(1800))
+                time.sleep(0.2)
+                ser.write(CMD_INVENTARIO_MULTI(10000))
+
+                print("  ENCOSTE A TAG NA ANTENA agora:")
+                for restante in range(JANELA_CEGA, 0, -1):
+                    if restante % 2 == 0 or restante <= 3:
+                        print(f"      faltam {restante} s")
+                    time.sleep(1.0)
+
+                ser.write(CMD_PARAR)
+                time.sleep(0.2)
+                sobrou = ser.read(ser.in_waiting or 1)
+        except serial.SerialException as erro:
+            print(f"  erro na porta: {erro}")
+            continue
+
+        if sobrou:
+            print(f"  ATENCAO: voltaram {len(sobrou)} bytes nesta velocidade!")
+            print(f"  {sobrou[:32].hex(' ').upper()}")
+            print("  O caminho de volta existe. Rode --varrer de novo.")
+        else:
+            print("  (nada de volta, como esperado neste modo)")
+
+    print()
+    print("=" * 62)
+    print("Leitura do resultado")
+    print("=" * 62)
+    print("  BIPOU em alguma velocidade  -> o modulo recebe e le a tag; o")
+    print("     defeito esta so no retorno (modulo -> CH340). Essa e a")
+    print("     velocidade da UART. O micro-USB nao serve para ler EPC, e o")
+    print("     J3 volta a ser necessario -- mas a cadeia RF esta provada.")
+    print()
+    print("  NAO BIPOU em nenhuma  -> nada sai do PC para o modulo tambem. O")
+    print("     CH340 esta isolado da UART do modulo nesta placa, nos dois")
+    print("     sentidos. O micro-USB nunca vai servir; o caminho e o J3.")
+    print()
+    print("  Em qualquer dos casos, anotar o resultado na secao 8 do")
+    print("  docs/HARDWARE_R200.md antes de desmontar a bancada.")
+
+
 # ---------------------------------------------------------------- principal
 def main():
     if len(sys.argv) < 2:
@@ -362,6 +446,10 @@ def main():
 
     if len(sys.argv) > 2 and sys.argv[2] in ("--diagnostico", "-d"):
         diagnosticar(porta)
+        return
+
+    if len(sys.argv) > 2 and sys.argv[2] in ("--cego", "-c"):
+        inventario_cego(porta)
         return
 
     baud = BAUD_PADRAO
