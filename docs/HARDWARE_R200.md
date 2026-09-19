@@ -160,7 +160,9 @@ Só depois que a Fase 1 passar.
 A placa vem **sem pinos soldados**. Dois grupos de furos importam:
 
 - **`J3`**, na borda direita, 4 furos em coluna, de cima para baixo: `3V3`, `RXD`, `TXD`, `GND` (o furo quadrado é o `GND`). É a UART do módulo, em nível 3,3 V, o mesmo do ESP32: liga direto, sem conversor de nível. Os resistores `R14`/`R15` ao lado devem ser os de série que separam essa UART do CH340, mas isso é suposição, não foi medido.
-- Fileira de 5 furos à esquerda do módulo blindado, ao lado da serigrafia `YPD-R200`, com um furo marcado **`5V`**. É a entrada de 5 V que alimenta o regulador da placa, o mesmo caminho do micro-USB.
+- **`J2`**, fileira à esquerda do módulo blindado, ao lado da serigrafia `YPD-R200`. São **seis** furos, não cinco, rotulados de cima para baixo `G` · `R` · `C` · `D` · **`5V`** · ■ — o último, quadrado, sem rótulo. O **`5V` é o quinto de cima para baixo**, segundo de baixo para cima, e é a entrada que alimenta o regulador da placa, o mesmo caminho do micro-USB. Conferido por ampliação da foto de bancada em 19/09/2026; a descrição anterior, de "5 furos com um marcado `5V`", estava errada.
+
+  > ⚠️ **O furo quadrado não é o `5V`** — ele fica logo abaixo. Como a convenção usual é o quadrado marcar o pino 1, é um erro fácil de cometer, e pino de alimentação no furo errado desta fileira pode danificar o módulo. Leia a serigrafia com a placa na mão antes de soldar.
 
 O micro-USB, o CH340 e o `J3` compartilham a única UART do módulo. Portanto: USB do R200 desconectado enquanto o ESP32 estiver no `J3`.
 

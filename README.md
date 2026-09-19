@@ -154,7 +154,7 @@ No modo código de barras são aceitos **Code 128, Code 39 e QR Code** — EAN e
 | Leitura por NFC | ✅ **Funciona** | Reader mode NfcA/B/F/V; código via registro NDEF de texto ou UID |
 | Lançamento manual de código | ✅ **Funciona** | Campo de texto para o bem sem etiqueta legível; mesma lista e deduplicação |
 | Fluxo de leitura patrimonial | 🟡 **Simulado** | O ESP32 devolve um registro patrimonial fictício após 800 ms |
-| Módulo leitor UHF na bancada | 🟡 **Em validação** | YPD-R200 (Impinj E710) recebido em 05/09/2026; ligado ao ESP32 por UART e alimentado por ele, o módulo liga e responde, mas os pinos sem solda deformam a conversa — solda pendente. Registro em [`docs/HARDWARE_R200.md`](docs/HARDWARE_R200.md) |
+| Módulo leitor UHF na bancada | 🟡 **Em validação** | YPD-R200 (Impinj E710) recebido em 05/09/2026; ligado ao ESP32 por UART e alimentado por ele, o módulo liga e responde, mas os pinos sem solda deformam a conversa — solda pendente. O micro-USB da própria placa foi testado como alternativa sem solda em 19/09/2026 e descartado. Registro em [`docs/HARDWARE_R200.md`](docs/HARDWARE_R200.md) |
 | Leitura de tag RFID UHF real | ❌ **Não existe** | Próximo passo após a solda: o firmware ainda não fala com o módulo |
 | Persistência local (histórico) | ❌ **Não existe** | Planejado com Room |
 | Integração com sistema de patrimônio | ❌ **Não existe** | Depende de API do sistema municipal |
@@ -168,7 +168,7 @@ Isso significa que **toda a espinha dorsal — captura, transporte, fragmentaç�
 
 > ### 🚧 O gargalo, dito com todas as letras
 >
-> Até setembro de 2026 o **modo RFID UHF** — e apenas ele — estava travado pela aquisição do módulo leitor, cerca de **R$ 1.200** de bancada. O módulo (YPD-R200) chegou em 05/09/2026 e já conversa com o ESP32 pela UART; falta soldar os pinos, confirmar a velocidade da serial e trocar a simulação do firmware pela leitura real. A partir daqui o gargalo é **tempo de bancada**, não compra.
+> Até setembro de 2026 o **modo RFID UHF** — e apenas ele — estava travado pela aquisição do módulo leitor, cerca de **R$ 1.200** de bancada. O módulo (YPD-R200) chegou em 05/09/2026 e já conversa com o ESP32 pela UART; falta soldar os pinos, confirmar a velocidade da serial e trocar a simulação do firmware pela leitura real. O gargalo deixou de ser compra: hoje é **um serviço de solda** — cinco pinos de barra macho, poucos minutos em qualquer assistência técnica de celular.
 >
 > Os modos **código de barras e NFC funcionam hoje, sem hardware nenhum**. E se o seu órgão já tem um leitor UHF de outro modelo, o relato comparativo vale muito — veja [Procuram-se parceiros](#-procuram-se-parceiros).
 
@@ -243,7 +243,7 @@ A lista de materiais abaixo vale **só para o modo RFID UHF**. Para conhecer o f
 
 > ⚠️ **Alimentação:** o R200 puxa picos acima de 500 mA na transmissão. **Nunca pelo pino 3.3V do ESP32.** Na bancada, o pino `VIN` do ESP32 (5 V da USB) sustentou o módulo nos testes de comando; para inventário contínuo, fonte externa de 5 V com GND compartilhado. E **antena conectada antes de energizar**, sempre: transmitir sem carga pode queimar o amplificador.
 
-> ⚠️ **Pinos:** a placa do R200 vem sem pinos. **Solde-os.** Pino apenas encaixado no furo alimenta a placa, mas não sustenta a UART — aprendemos isso em uma tarde inteira de bancada.
+> ⚠️ **Pinos:** a placa do R200 vem sem pinos. **Solde-os.** Pino apenas encaixado no furo alimenta a placa, mas não sustenta a UART — aprendemos isso em uma tarde inteira de bancada. E o micro-USB da própria placa **não é atalho**: gastamos um segundo dia provando que o CH340 dela não entrega os dados do módulo ao PC, em velocidade nenhuma. Os dois becos sem saída estão documentados, com os sintomas, para você não repetir nenhum dos dois.
 
 > 💡 **Windows sem administrador:** o CH340 do R200 exige driver de fabricante e o Windows não o traz sozinho. O ESP32 DevKit (CH9102) usa o driver embutido. A saída é gravar `firmware/ponte_uart` no ESP32 e falar com o R200 através dele — detalhes na seção 2b do documento do hardware.
 
@@ -254,7 +254,7 @@ A lista de materiais abaixo vale **só para o modo RFID UHF**. Para conhecer o f
 3. Selecione a placa **DOIT ESP32 DEVKIT V1** e a porta serial correspondente.
 4. Compile e grave. Abra o Serial Monitor em **115200 baud** para acompanhar os logs.
 
-Ferramentas de bancada do módulo UHF, à parte do firmware: `firmware/teste_r200.py` (PC, exercita o protocolo do R200), `firmware/ponte_uart/` (ESP32 como conversor USB-serial) e `firmware/diag_r200/` (ESP32 testa a UART do R200 sozinho, varrendo velocidades). Uso descrito em [`docs/HARDWARE_R200.md`](docs/HARDWARE_R200.md).
+Ferramentas de bancada do módulo UHF, à parte do firmware: `firmware/teste_r200.py` (PC, exercita o protocolo do R200, com varredura de velocidade da UART e modos de diagnóstico para linha muda), `firmware/ponte_uart/` (ESP32 como conversor USB-serial) e `firmware/diag_r200/` (ESP32 testa a UART do R200 sozinho, varrendo velocidades). Uso descrito em [`docs/HARDWARE_R200.md`](docs/HARDWARE_R200.md).
 
 ```
 [BOOT] ESP32 iniciado
