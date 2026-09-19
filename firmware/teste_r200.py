@@ -11,6 +11,8 @@ Uso:
     pip install pyserial
     python teste_r200.py                 # lista as portas disponiveis
     python teste_r200.py COM5            # Windows
+    python teste_r200.py /dev/ttyUSB0 --varrer   # descobre a velocidade da UART
+    python teste_r200.py /dev/ttyUSB0 9600       # forca uma velocidade
     python teste_r200.py /dev/ttyUSB0    # Linux
 
 ATENCAO: conecte a antena ANTES de energizar o modulo.
@@ -26,7 +28,8 @@ try:
 except ImportError:
     sys.exit("Falta a biblioteca pyserial. Rode:  pip install pyserial")
 
-BAUD = 115200
+BAUD_PADRAO = 115200
+BAUDS_CANDIDATOS = [9600, 19200, 38400, 57600, 115200, 230400]
 
 # ---------------------------------------------------------------- protocolo
 # Estrutura do frame MagicRF:
@@ -149,6 +152,59 @@ def listar_portas():
     print("\nRode de novo passando a porta, ex:  python teste_r200.py " + portas[0].device)
 
 
+# ---------------------------------------------------------------- varredura
+def varrer_baud(porta: str):
+    """Descobre em que velocidade a UART do modulo fala.
+
+    Manda a versao de hardware em cada candidata e verifica se volta um frame
+    MagicRF valido. Velocidade errada devolve lixo que nao fecha checksum; a
+    certa devolve algo como  BB 01 03 ... 7E.
+    """
+    print(f"Varrendo velocidades em {porta}...\n")
+    achadas = []
+
+    for baud in BAUDS_CANDIDATOS:
+        try:
+            with serial.Serial(porta, baud, timeout=0.2) as ser:
+                time.sleep(0.3)
+                ser.reset_input_buffer()
+                ser.write(CMD_INFO(0x00))
+                time.sleep(0.4)
+                resposta = ser.read(ser.in_waiting or 1)
+        except serial.SerialException as erro:
+            print(f"  {baud:>6} baud : erro ao abrir a porta ({erro})")
+            continue
+
+        if not resposta:
+            print(f"  {baud:>6} baud : (sem resposta)")
+            continue
+
+        frames = extrair_frames(bytearray(resposta))
+        if frames:
+            print(f"  {baud:>6} baud : FRAME VALIDO   {frames[0].hex(' ').upper()}")
+            achadas.append(baud)
+        else:
+            amostra = resposta[:16].hex(" ").upper()
+            print(f"  {baud:>6} baud : {len(resposta)} bytes sem frame valido   {amostra}")
+
+    print()
+    if len(achadas) == 1:
+        baud = achadas[0]
+        print(f"Velocidade do modulo: {baud} baud.")
+        print(f"Anote na secao 4 do docs/HARDWARE_R200.md e rode:")
+        print(f"    python3 teste_r200.py {porta} {baud}")
+    elif not achadas:
+        print("Nenhuma velocidade devolveu frame valido.")
+        print()
+        print("Se todas devolveram bytes deformados parecidos (00 80 C0 E0 F0 FC FE),")
+        print("o problema e contato eletrico, nao velocidade. Pelo micro-USB da placa")
+        print("isso nao deveria acontecer: confira a alimentacao e troque o cabo")
+        print("(cabo so de carga nao tem as linhas de dados).")
+    else:
+        print(f"Mais de uma velocidade respondeu: {achadas}.")
+        print("Rode o teste completo em cada uma e fique com a que ler tag.")
+
+
 # ---------------------------------------------------------------- principal
 def main():
     if len(sys.argv) < 2:
@@ -156,9 +212,21 @@ def main():
         return
 
     porta = sys.argv[1]
-    print(f"Abrindo {porta} a {BAUD} baud...")
 
-    with serial.Serial(porta, BAUD, timeout=0.2) as ser:
+    if len(sys.argv) > 2 and sys.argv[2] in ("--varrer", "-v"):
+        varrer_baud(porta)
+        return
+
+    baud = BAUD_PADRAO
+    if len(sys.argv) > 2:
+        try:
+            baud = int(sys.argv[2])
+        except ValueError:
+            sys.exit(f"Velocidade invalida: {sys.argv[2]}. Passe um numero ou --varrer.")
+
+    print(f"Abrindo {porta} a {baud} baud...")
+
+    with serial.Serial(porta, baud, timeout=0.2) as ser:
         # 2 s: se a porta for um ESP32 rodando ponte_uart.ino, abrir a porta
         # reinicia a placa (DTR) e ela precisa desse tempo para voltar.
         time.sleep(2.0)
@@ -217,6 +285,8 @@ def main():
         for epc, contagem in vistas.items():
             print(f"  {epc}  ({contagem} leituras)")
         print("=" * 55)
+
+
 
 
 if __name__ == "__main__":
