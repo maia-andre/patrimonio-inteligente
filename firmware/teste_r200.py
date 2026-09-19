@@ -13,6 +13,7 @@ Uso:
     python teste_r200.py COM5            # Windows
     python teste_r200.py /dev/ttyUSB0 --varrer   # descobre a velocidade da UART
     python teste_r200.py /dev/ttyUSB0 9600       # forca uma velocidade
+    python teste_r200.py /dev/ttyUSB0 --diagnostico  # porta abre mas nada volta
     python teste_r200.py /dev/ttyUSB0    # Linux
 
 ATENCAO: conecte a antena ANTES de energizar o modulo.
@@ -205,6 +206,126 @@ def varrer_baud(porta: str):
         print("Rode o teste completo em cada uma e fique com a que ler tag.")
 
 
+# ---------------------------------------------------------------- diagnostico
+COMBINACOES_CONTROLE = [
+    (True, True),    # padrao do pyserial ao abrir
+    (False, False),  # ambas soltas: descarta reset preso por DTR/RTS
+    (True, False),
+    (False, True),
+]
+
+
+def diagnosticar(porta: str):
+    """Investiga o caso 'porta abre mas nada volta' em todas as velocidades.
+
+    Velocidade errada devolve lixo, nao silencio. Silencio em todas quer dizer
+    que nada chega do modulo ao PC, e as causas sao outras: porta que nao e o
+    R200, modulo sem alimentar, modulo presa em reset por DTR/RTS, ou o CH340
+    isolado da UART do modulo na propria placa.
+    """
+    print("=" * 62)
+    print("1. Identidade da porta")
+    print("=" * 62)
+
+    encontrada = None
+    for p in serial.tools.list_ports.comports():
+        if p.device == porta:
+            encontrada = p
+
+    if encontrada is None:
+        print(f"  {porta} nao aparece entre as portas seriais.")
+    else:
+        vid = f"{encontrada.vid:04X}" if encontrada.vid is not None else "????"
+        pid = f"{encontrada.pid:04X}" if encontrada.pid is not None else "????"
+        print(f"  dispositivo : {encontrada.device}")
+        print(f"  VID:PID     : {vid}:{pid}")
+        print(f"  descricao   : {encontrada.description}")
+        print(f"  fabricante  : {encontrada.manufacturer}")
+        if (vid, pid) == ("1A86", "7523"):
+            print("  --> CH340 do R200, como esperado.")
+        else:
+            print("  --> NAO e o CH340 esperado (1A86:7523). Porta errada?")
+
+    print()
+    print("=" * 62)
+    print("2. Escuta passiva, 5 s, sem enviar nada")
+    print("=" * 62)
+    print("  Alguns modulos falam sozinhos ao ligar. Se vier byte aqui,")
+    print("  o caminho modulo -> PC existe e o problema e so de comando.")
+
+    espontaneos = b""
+    try:
+        with serial.Serial(porta, BAUD_PADRAO, timeout=0.5) as ser:
+            fim = time.time() + 5.0
+            while time.time() < fim:
+                espontaneos += ser.read(ser.in_waiting or 1)
+    except serial.SerialException as erro:
+        print(f"  erro ao abrir: {erro}")
+        return
+
+    if espontaneos:
+        print(f"  {len(espontaneos)} bytes: {espontaneos[:32].hex(' ').upper()}")
+    else:
+        print("  nada (normal: o R200 so responde quando perguntado)")
+
+    print()
+    print("=" * 62)
+    print("3. Linhas de controle: DTR/RTS prendem o modulo em reset?")
+    print("=" * 62)
+    print("  O pyserial levanta DTR e RTS ao abrir. Em placas que usam essas")
+    print("  linhas para reset, isso mantem o modulo parado o tempo todo.")
+
+    houve_resposta = False
+    for dtr, rts in COMBINACOES_CONTROLE:
+        try:
+            with serial.Serial(porta, BAUD_PADRAO, timeout=0.3) as ser:
+                ser.dtr = dtr
+                ser.rts = rts
+                time.sleep(0.4)
+                ser.reset_input_buffer()
+                ser.write(CMD_INFO(0x00))
+                time.sleep(0.5)
+                resposta = ser.read(ser.in_waiting or 1)
+        except serial.SerialException as erro:
+            print(f"  DTR={dtr!s:<5} RTS={rts!s:<5} : erro ({erro})")
+            continue
+
+        rotulo = f"  DTR={dtr!s:<5} RTS={rts!s:<5} : "
+        if resposta:
+            houve_resposta = True
+            print(f"{rotulo}{len(resposta)} bytes  {resposta[:24].hex(' ').upper()}")
+        else:
+            print(f"{rotulo}(sem resposta)")
+
+    print()
+    print("=" * 62)
+    print("Conclusao")
+    print("=" * 62)
+
+    if houve_resposta or espontaneos:
+        print("  Chegou byte do modulo. O caminho existe.")
+        print("  Se foi so em uma combinacao de DTR/RTS, era reset preso:")
+        print("  rode a varredura de velocidade nessa combinacao.")
+        return
+
+    print("  Nenhum byte, em nenhuma condicao. O modulo nao esta falando com")
+    print("  o PC. Em ordem de probabilidade:")
+    print()
+    print("  1. O modulo nao esta ligado de fato. Ele tem LED verde e bipe de")
+    print("     boot (visto em 05/09 quando alimentado pelo VIN do ESP32).")
+    print("     Sem LED e sem bipe ao plugar, e alimentacao: porta USB fraca")
+    print("     ou o CH340 enumerando com o modulo sem energia. Teste o")
+    print("     micro-USB num carregador de parede so para ver se acende.")
+    print()
+    print("  2. O CH340 esta isolado da UART do modulo nesta revisao da placa")
+    print("     (R14/R15 sem componente). Nesse caso o micro-USB NUNCA vai")
+    print("     conversar com o modulo, e o J3 e o unico caminho -- o que")
+    print("     traz a solda de volta. Ver secao 3 do docs/HARDWARE_R200.md.")
+    print()
+    print("  3. Cabo com mau contato intermitente. Menos provavel: a porta")
+    print("     enumerou, entao as linhas de dados funcionam.")
+
+
 # ---------------------------------------------------------------- principal
 def main():
     if len(sys.argv) < 2:
@@ -215,6 +336,10 @@ def main():
 
     if len(sys.argv) > 2 and sys.argv[2] in ("--varrer", "-v"):
         varrer_baud(porta)
+        return
+
+    if len(sys.argv) > 2 and sys.argv[2] in ("--diagnostico", "-d"):
+        diagnosticar(porta)
         return
 
     baud = BAUD_PADRAO
