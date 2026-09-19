@@ -16,6 +16,7 @@ Uso:
     python teste_r200.py /dev/ttyUSB0 --diagnostico  # porta abre mas nada volta
     python teste_r200.py /dev/ttyUSB0 --cego         # nada volta: ouvir o buzzer
     python teste_r200.py /dev/ttyUSB0 --eco          # loopback no J3
+    python teste_r200.py /dev/ttyUSB0 --cru [baud]   # monitor cru, sem filtro nenhum
     python teste_r200.py /dev/ttyUSB0    # Linux
 
 ATENCAO: conecte a antena ANTES de energizar o modulo.
@@ -85,8 +86,10 @@ def abrir_porta(porta: str, baud: int, timeout: float = 0.2,
     modulo: o buzzer deu bipe de boot sempre no mesmo instante depois da
     abertura, identico em todas as velocidades -- se fosse leitura de tag
     dependeria do baud certo e nao se repetiria igual. Comando enviado antes
-    disso chega durante o boot e se perde, que foi a causa real do
-    "(sem resposta)" em toda a varredura daquele dia.
+    disso chega durante o boot e se perde.
+
+    NAO limpa o buffer: o que chegar durante a espera e informacao, nao lixo.
+    Quem chama decide o que fazer com isso, com drenar().
     """
     ser = serial.Serial()
     ser.port = porta
@@ -97,8 +100,35 @@ def abrir_porta(porta: str, baud: int, timeout: float = 0.2,
     ser.open()
     if espera_boot > 0:
         time.sleep(espera_boot)
-        ser.reset_input_buffer()
     return ser
+
+
+def drenar(ser) -> bytes:
+    """Devolve o que ja estiver no buffer, sem descartar nada em silencio."""
+    return ser.read(ser.in_waiting) if ser.in_waiting else b""
+
+
+def ler_ate_silencio(ser, silencio: float = 0.4, limite: float = 3.0) -> bytes:
+    """Le ate a linha ficar quieta, em vez de pegar so o primeiro punhado.
+
+    `ser.read(ser.in_waiting or 1)` devolve so o que ja chegou naquele
+    instante, e trunca resposta que vem em fluxo. Aqui se acumula enquanto
+    houver byte novo, parando depois de `silencio` sem nada ou ao atingir
+    `limite`.
+    """
+    recebido = b""
+    ultimo = time.time()
+    comeco = ultimo
+    while time.time() - comeco < limite:
+        pedaco = drenar(ser)
+        if pedaco:
+            recebido += pedaco
+            ultimo = time.time()
+        elif time.time() - ultimo >= silencio:
+            break
+        else:
+            time.sleep(0.02)
+    return recebido
 
 
 # ---------------------------------------------------------------- parser
@@ -169,10 +199,11 @@ def interpretar_tag(frame: bytes):
 def enviar(ser, frame: bytes, rotulo: str, espera: float = 0.3):
     print(f"\n>>> {rotulo}")
     print(f"    TX: {frame.hex(' ').upper()}")
-    ser.reset_input_buffer()
+    pendente = drenar(ser)
+    if pendente:
+        print(f"    (antes: {len(pendente)} bytes ja no buffer) {pendente[:24].hex(' ').upper()}")
     ser.write(frame)
-    time.sleep(espera)
-    resposta = ser.read(ser.in_waiting or 1)
+    resposta = ler_ate_silencio(ser, limite=max(espera * 3, 1.5))
     if resposta:
         print(f"    RX: {resposta.hex(' ').upper()}")
     else:
@@ -211,31 +242,41 @@ def varrer_baud(porta: str):
     for baud in BAUDS_CANDIDATOS:
         try:
             with abrir_porta(porta, baud) as ser:
+                durante_boot = drenar(ser)
+
                 # Se uma sessao anterior morreu no meio de um inventario
                 # continuo, o modulo ainda esta despejando notificacao de tag e
                 # a resposta da versao se perde no meio. Parar antes de perguntar.
                 ser.write(CMD_PARAR)
-                time.sleep(0.3)
-                ser.reset_input_buffer()
+                apos_parar = ler_ate_silencio(ser, silencio=0.3, limite=1.0)
 
                 ser.write(CMD_INFO(0x00))
-                time.sleep(0.6)
-                resposta = ser.read(ser.in_waiting or 1)
+                resposta = ler_ate_silencio(ser)
         except serial.SerialException as erro:
             print(f"  {baud:>6} baud : erro ao abrir a porta ({erro})")
             continue
 
+        extras = []
+        if durante_boot:
+            extras.append(f"{len(durante_boot)}B no boot")
+        if apos_parar:
+            extras.append(f"{len(apos_parar)}B no parar")
+        sufixo = ("   [" + ", ".join(extras) + "]") if extras else ""
+
         if not resposta:
-            print(f"  {baud:>6} baud : (sem resposta)")
+            print(f"  {baud:>6} baud : (sem resposta){sufixo}")
+            for rotulo, dado in (("boot", durante_boot), ("parar", apos_parar)):
+                if dado:
+                    print(f"           {rotulo}: {dado[:24].hex(' ').upper()}")
             continue
 
         frames = extrair_frames(bytearray(resposta))
         if frames:
-            print(f"  {baud:>6} baud : FRAME VALIDO   {frames[0].hex(' ').upper()}")
+            print(f"  {baud:>6} baud : FRAME VALIDO   {frames[0].hex(' ').upper()}{sufixo}")
             achadas.append(baud)
         else:
             amostra = resposta[:16].hex(" ").upper()
-            print(f"  {baud:>6} baud : {len(resposta)} bytes sem frame valido   {amostra}")
+            print(f"  {baud:>6} baud : {len(resposta)} bytes sem frame valido   {amostra}{sufixo}")
 
     print()
     print(f"(varredura levou {time.time() - comecou:.1f} s)")
@@ -309,7 +350,8 @@ def diagnosticar(porta: str):
         with abrir_porta(porta, BAUD_PADRAO, timeout=0.5) as ser:
             fim = time.time() + 5.0
             while time.time() < fim:
-                espontaneos += ser.read(ser.in_waiting or 1)
+                espontaneos += drenar(ser)
+                time.sleep(0.05)
     except serial.SerialException as erro:
         print(f"  erro ao abrir: {erro}")
         return
@@ -331,8 +373,7 @@ def diagnosticar(porta: str):
         try:
             with abrir_porta(porta, BAUD_PADRAO, timeout=0.3, dtr=dtr, rts=rts) as ser:
                 ser.write(CMD_INFO(0x00))
-                time.sleep(0.6)
-                resposta = ser.read(ser.in_waiting or 1)
+                resposta = ler_ate_silencio(ser)
         except serial.SerialException as erro:
             print(f"  DTR={dtr!s:<5} RTS={rts!s:<5} : erro ({erro})")
             continue
@@ -425,8 +466,7 @@ def inventario_cego(porta: str):
                     time.sleep(1.0)
 
                 ser.write(CMD_PARAR)
-                time.sleep(0.2)
-                sobrou = ser.read(ser.in_waiting or 1)
+                sobrou = ler_ate_silencio(ser, silencio=0.3, limite=1.5)
         except serial.SerialException as erro:
             print(f"  erro na porta: {erro}")
             continue
@@ -514,10 +554,8 @@ def teste_eco(porta: str):
 
         try:
             with abrir_porta(porta, BAUD_PADRAO, timeout=0.5) as ser:
-                ser.reset_input_buffer()
                 ser.write(PADRAO_ECO)
-                time.sleep(0.6)
-                volta = ser.read(ser.in_waiting or 1)
+                volta = ler_ate_silencio(ser)
         except serial.SerialException as erro:
             print(f"  erro na porta: {erro}")
             return
@@ -548,6 +586,63 @@ def teste_eco(porta: str):
         print()
 
 
+# ---------------------------------------------------------------- cru
+def monitor_cru(porta: str, baud: int):
+    """Monitor serial sem esperteza nenhuma: mostra tudo que chegar.
+
+    Existe porque os outros modos decidem coisas -- esperam boot, limpam
+    buffer, param no primeiro punhado de bytes, exigem checksum valido -- e
+    cada decisao dessas pode esconder evidencia. Aqui nao ha decisao: abre a
+    porta sem esperar boot, nao limpa nada, nao interpreta frame, e imprime
+    byte com carimbo de tempo ate voce mandar parar.
+
+    Serve para responder "sera que o script esta deixando passar?" sem ter de
+    confiar no script.
+    """
+    print("=" * 62)
+    print(f"MONITOR CRU -- {porta} a {baud} baud")
+    print("=" * 62)
+    print("  Nao espera boot, nao limpa buffer, nao interpreta nada.")
+    print("  Manda a versao de hardware aos 3 s e aos 8 s; fora isso, escuta.")
+    print("  Ctrl+C para encerrar.")
+    print()
+
+    total = 0
+    try:
+        with abrir_porta(porta, baud, timeout=0.1, espera_boot=0.0) as ser:
+            t0 = time.time()
+            enviados = []
+            while True:
+                agora = time.time() - t0
+
+                for instante in (3.0, 8.0):
+                    if instante not in enviados and agora >= instante:
+                        enviados.append(instante)
+                        quadro = CMD_INFO(0x00)
+                        ser.write(quadro)
+                        print(f"  [{agora:6.2f}s] TX {quadro.hex(' ').upper()}")
+
+                pedaco = drenar(ser)
+                if pedaco:
+                    total += len(pedaco)
+                    print(f"  [{agora:6.2f}s] RX {len(pedaco):>3}B  {pedaco.hex(' ').upper()}")
+                else:
+                    time.sleep(0.02)
+    except serial.SerialException as erro:
+        print(f"  erro na porta: {erro}")
+        return
+    except KeyboardInterrupt:
+        pass
+
+    print()
+    print(f"  total recebido: {total} bytes")
+    if total == 0:
+        print("  Nada, nem um byte. Nao e o script filtrando: nao chega nada.")
+    else:
+        print("  Chegou byte. Compare com o que os outros modos relataram --")
+        print("  se eles disseram (sem resposta), o filtro esta neles.")
+
+
 # ---------------------------------------------------------------- principal
 def main():
     if len(sys.argv) < 2:
@@ -570,6 +665,16 @@ def main():
 
     if len(sys.argv) > 2 and sys.argv[2] in ("--eco", "-e"):
         teste_eco(porta)
+        return
+
+    if len(sys.argv) > 2 and sys.argv[2] in ("--cru", "-r"):
+        baud_cru = BAUD_PADRAO
+        if len(sys.argv) > 3:
+            try:
+                baud_cru = int(sys.argv[3])
+            except ValueError:
+                sys.exit(f"Velocidade invalida: {sys.argv[3]}")
+        monitor_cru(porta, baud_cru)
         return
 
     baud = BAUD_PADRAO
