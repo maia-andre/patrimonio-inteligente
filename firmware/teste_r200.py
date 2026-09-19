@@ -463,7 +463,15 @@ def teste_eco(porta: str):
     """Loopback no J3: o CH340 consegue escutar a si mesmo?
 
     Serve para partir em dois o caso "a ida funciona e a volta nao". Com os
-    furos RXD e TXD do J3 em curto, o que o PC escreve tem que voltar.
+    furos RXD e TXD do J3 em curto, o que o PC escreve tem que voltar. Mesmo
+    metodo do loopback RX2/TX2 que validou a ponte serial no ESP32 em
+    05/09/2026, mas em outra placa: la era a UART2 do ESP32, aqui e o CH340
+    do proprio R200.
+
+    O resultado e assimetrico, porque o contato pino-furo sem solda continua
+    sendo o elo fraco: eco completo prova (contato ruim nao gera eco perfeito
+    por acaso), eco nenhum nao prova nada -- pode ser o defeito ou pode ser o
+    mesmo contato resistivo que deformou a UART em 05/09.
 
     Eco completo  -> PC <-> CH340 <-> J3 esta integro. O defeito esta do J3
                      para dentro: a linha TXD do modulo nao chega ate ali.
@@ -477,9 +485,13 @@ def teste_eco(porta: str):
     print("TESTE DE ECO (loopback no J3)")
     print("=" * 62)
     print()
-    print("  Encoste algo metalico ligando os furos RXD e TXD do J3.")
-    print("  Fio descascado, clipe de papel, ponta de jumper -- serve qualquer")
-    print("  coisa que toque os dois ao mesmo tempo. Nao precisa de solda.")
+    print("  Ligue os furos RXD e TXD do J3 um no outro. Sem solda.")
+    print()
+    print("  Melhor jeito: um pino reto em cada furo e um jumper femea-femea")
+    print("  entre os dois -- mesmo metodo do loopback RX2/TX2 que validou a")
+    print("  ponte no ESP32. So o contato pino-furo fica duvidoso; o encaixe")
+    print("  jumper-pino e conector de verdade.")
+    print("  Alternativa pior: clipe de papel encostando nos dois furos.")
     print()
     print("  Ordem dos furos no J3, de cima para baixo:  3V3  RXD  TXD  GND")
     print("  (o furo quadrado e o GND)")
