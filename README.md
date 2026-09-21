@@ -154,8 +154,8 @@ No modo código de barras são aceitos **Code 128, Code 39 e QR Code** — EAN e
 | Leitura por NFC | ✅ **Funciona** | Reader mode NfcA/B/F/V; código via registro NDEF de texto ou UID |
 | Lançamento manual de código | ✅ **Funciona** | Campo de texto para o bem sem etiqueta legível; mesma lista e deduplicação |
 | Fluxo de leitura patrimonial | 🟡 **Simulado** | O ESP32 devolve um registro patrimonial fictício após 800 ms |
-| Módulo leitor UHF na bancada | 🟡 **Em validação** | YPD-R200 (Impinj E710) recebido em 05/09/2026; ligado ao ESP32 por UART e alimentado por ele, o módulo liga e responde, mas os pinos sem solda deformam a conversa — solda pendente. O micro-USB da própria placa foi testado como alternativa sem solda em 19/09/2026 e descartado. Registro em [`docs/HARDWARE_R200.md`](docs/HARDWARE_R200.md) |
-| Leitura de tag RFID UHF real | ❌ **Não existe** | Próximo passo após a solda: o firmware ainda não fala com o módulo |
+| Módulo leitor UHF na bancada | 🟡 **Em validação** | YPD-R200 (Impinj E710) recebido em 05/09/2026; ligado ao ESP32 por UART e alimentado por ele, o módulo liga e responde, mas os pinos sem solda deformavam a conversa. O micro-USB da própria placa foi testado como alternativa sem solda em 19/09/2026 e descartado; os pinos foram soldados em 21/09/2026 e a primeira energização com eles ainda não foi medida. Registro em [`docs/HARDWARE_R200.md`](docs/HARDWARE_R200.md) |
+| Leitura de tag RFID UHF real | ❌ **Não existe** | Próximo passo: confirmar a velocidade da UART com os pinos soldados; o firmware ainda não fala com o módulo |
 | Persistência local (histórico) | ❌ **Não existe** | Planejado com Room |
 | Integração com sistema de patrimônio | ❌ **Não existe** | Depende de API do sistema municipal |
 | Camada de IA (reconciliação, anomalias) | ❌ **Não existe** | Especificada em [Onde entra a IA](#-onde-entra-a-inteligência-artificial) |
@@ -168,7 +168,7 @@ Isso significa que **toda a espinha dorsal — captura, transporte, fragmentaç�
 
 > ### 🚧 O gargalo, dito com todas as letras
 >
-> Até setembro de 2026 o **modo RFID UHF** — e apenas ele — estava travado pela aquisição do módulo leitor, cerca de **R$ 1.200** de bancada. O módulo (YPD-R200) chegou em 05/09/2026 e já conversa com o ESP32 pela UART; falta soldar os pinos, confirmar a velocidade da serial e trocar a simulação do firmware pela leitura real. O gargalo deixou de ser compra: hoje é **um serviço de solda** — cinco pinos de barra macho, poucos minutos em qualquer assistência técnica de celular.
+> Até setembro de 2026 o **modo RFID UHF** — e apenas ele — estava travado pela aquisição do módulo leitor, cerca de **R$ 1.200** de bancada. O módulo (YPD-R200) chegou em 05/09/2026 e já conversa com o ESP32 pela UART; os pinos foram soldados em 21/09/2026; falta confirmar a velocidade da serial e trocar a simulação do firmware pela leitura real. O gargalo deixou de ser compra e deixou de ser solda: hoje é **tempo de bancada**.
 >
 > Os modos **código de barras e NFC funcionam hoje, sem hardware nenhum**. E se o seu órgão já tem um leitor UHF de outro modelo, o relato comparativo vale muito — veja [Procuram-se parceiros](#-procuram-se-parceiros).
 
@@ -362,7 +362,8 @@ graph LR
 
 **Médio prazo — com o YPD-R200 na bancada (recebido em 05/09/2026)**
 - [x] Ligar o R200 ao ESP32 via UART2: fiação validada, módulo liga e responde
-- [ ] Soldar os pinos do R200 e confirmar a velocidade da UART com o `diag_r200`
+- [x] Soldar os pinos do R200 (21/09/2026)
+- [ ] Confirmar a velocidade da UART com o `diag_r200`
 - [ ] Ler a primeira tag pelo `teste_r200.py` através da ponte serial
 - [ ] Implementar os comandos de inventário do módulo no firmware (`uhf_r200.cpp`)
 - [ ] Substituir a mensagem simulada pelo EPC real lido da tag, no formato `EPC;`

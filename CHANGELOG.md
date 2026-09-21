@@ -1,5 +1,13 @@
 # Changelog
 
+## Pinos soldados e a primeira energização (21/09/2026)
+A solda que faltava foi feita em assistência técnica: 4 pinos em `J3` e 1 no furo `5V` do `J2`. Fotos 6 a 8 em `docs/`. Registro em `docs/HARDWARE_R200.md`, seção 8c.
+
+- Conferido em foto que a solda do `J2` caiu no furo certo — o vizinho do quadrado, não o quadrado — que era o erro anunciado em 19/09.
+- Primeira energização com os pinos: o buzzer do R200 bipou três vezes seguidas e o teste foi interrompido pelo ambiente antes de qualquer medição. Como o módulo bipa uma vez por boot, a hipótese principal é reinício em série por queda no `VIN`; as alternativas e o roteiro para a próxima energização estão na seção 8c. Nada foi provado nem descartado.
+- `diag_r200` compilado pelo `arduino-cli` embutido na Arduino IDE (core 3.3.11), sem abrir a IDE — o caminho de gravação pela linha de comando funciona no Windows sem administrador.
+- README: o gargalo do modo UHF deixa de ser solda; roadmap separa "soldar" (feito) de "confirmar a velocidade".
+
 ## Bancada Debian e o micro-USB descartado (19/09/2026)
 Dia inteiro de bancada tentando chegar à primeira tag **sem solda**, pelo micro-USB da própria placa. O caminho não funciona neste módulo. Fica registrado com o diagnóstico, porque beco sem saída documentado também poupa a tarde de quem vier depois. Detalhamento em `docs/HARDWARE_R200.md`, seções 2c e 8b.
 

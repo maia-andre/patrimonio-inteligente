@@ -157,7 +157,7 @@ Só depois que a Fase 1 passar.
 
 ### O que a placa tem (conferido em foto, 05/09/2026)
 
-A placa vem **sem pinos soldados**. Dois grupos de furos importam:
+A placa vem **sem pinos soldados** — os desta unidade foram soldados em assistência técnica entre 19 e 21/09/2026 (fotos 6 a 8 em `docs/`, seção 8c). Dois grupos de furos importam:
 
 - **`J3`**, na borda direita, 4 furos em coluna, de cima para baixo: `3V3`, `RXD`, `TXD`, `GND` (o furo quadrado é o `GND`). É a UART do módulo, em nível 3,3 V, o mesmo do ESP32: liga direto, sem conversor de nível. Os resistores `R14`/`R15` ao lado devem ser os de série que separam essa UART do CH340, mas isso é suposição, não foi medido.
 - **`J2`**, fileira à esquerda do módulo blindado, ao lado da serigrafia `YPD-R200`. São **seis** furos, não cinco, rotulados de cima para baixo `G` · `R` · `C` · `D` · **`5V`** · ■ — o último, quadrado, sem rótulo. O **`5V` é o quinto de cima para baixo**, segundo de baixo para cima, e é a entrada que alimenta o regulador da placa, o mesmo caminho do micro-USB. Conferido por ampliação da foto de bancada em 19/09/2026; a descrição anterior, de "5 furos com um marcado `5V`", estava errada.
@@ -166,7 +166,7 @@ A placa vem **sem pinos soldados**. Dois grupos de furos importam:
 
 O micro-USB, o CH340 e o `J3` compartilham a única UART do módulo. Portanto: USB do R200 desconectado enquanto o ESP32 estiver no `J3`.
 
-Para pôr pinos: cortar 4 posições da barra de pinos e **soldar** em `J3`, mais 1 pino reto soldado no furo `5V`. Não há atalho sem solda: em 05/09/2026 foram tentados pino em L inclinado no furo, pino reto atravessando o furo com a placa apoiada na protoboard e pressão com o dedo. Alimentação (`5V`, `GND`) até funciona assim, porque a placa liga e não reinicia; os sinais `TXD`/`RXD` não, porque o contato fica resistivo e a UART recebe só bytes deformados (ver seção 6). Dez minutos de ferro resolvem o que uma tarde de improviso não resolveu.
+Para pôr pinos: cortar 4 posições da barra de pinos e **soldar** em `J3`, mais 1 pino reto soldado no furo `5V` — foi o que se fez. Não há atalho sem solda: em 05/09/2026 foram tentados pino em L inclinado no furo, pino reto atravessando o furo com a placa apoiada na protoboard e pressão com o dedo. Alimentação (`5V`, `GND`) até funciona assim, porque a placa liga e não reinicia; os sinais `TXD`/`RXD` não, porque o contato fica resistivo e a UART recebe só bytes deformados (ver seção 6). Dez minutos de ferro resolvem o que uma tarde de improviso não resolveu.
 
 ### Pinagem
 
@@ -348,6 +348,44 @@ qualquer medição futura, inclusive pela ponte do ESP32.
 O que não ficou provado, e segue em aberto: a velocidade da UART e a leitura de uma tag.
 As duas dependem agora do `J3` com contato firme.
 
+## 8c. Registro de bancada — 21/09/2026 (pinos soldados, primeira energização)
+
+Pinos soldados em assistência técnica: 4 posições de barra macho reta em `J3` e 1 pino no
+furo `5V` do `J2`. Conferido em foto (`docs/Foto 6` a `Foto 8`): pelo verso, as quatro juntas
+do `J3` estão fechadas e o ponto de solda do `J2` está no furo **vizinho do quadrado**, isto é,
+no `5V` — não no quadrado, que era o erro a evitar (seção 3). `3V3` do `J3` recebeu pino mas
+fica sem fio.
+
+Montagem do dia, no Windows do trabalho: Dupont fêmea-fêmea direto nos pinos, sem
+protoboard — `J3 TXD`→`RX2`, `J3 RXD`→`TX2`, `J3 GND`→`GND`, `5V`→`VIN`; antena de painel no
+`CON1`; micro-USB do R200 solto. O `diag_r200` foi compilado pelo `arduino-cli` embutido na
+IDE (core 3.3.11, `esp32doit-devkit-v1`, 272 KB) mas **não chegou a ser gravado**.
+
+O que aconteceu: ao plugar o USB do ESP32, o buzzer do R200 **bipou três vezes** em seguida.
+O cabo foi retirado logo depois por causa do ambiente, então não se sabe se bipava mais.
+Nenhuma medição foi feita — o Windows nem chegou a ser consultado com o cabo ligado.
+
+Hipóteses, **não conferidas**, da mais provável para a menos:
+
+1. **Reinício em série por queda no `VIN`.** O módulo bipa uma vez por boot (05/09 e 19/09);
+   mais de um bipe é mais de um boot. USB de pouca corrente, cabo fino ou o pico de
+   inicialização do rádio do ESP32 (se ainda estiver com o `firmware.ino` gravado) derrubam
+   o `VIN` no instante em que o R200 puxa o pico de partida. A seção 3 já prevê a saída:
+   fonte externa de 5 V no `5V`/`GND`, com o `GND` em comum com o ESP32.
+2. **Jumper do `VIN` ou do `GND` mal encaixado.** Contato ruim dá bipes aleatórios, e balançar
+   o fio com o módulo ligado reproduz. Menos provável com pino soldado e Dupont novo.
+3. **O que estava gravado no ESP32 mandou algo pelo `TX2`.** Nem o `diag_r200` nem a
+   `ponte_uart` fazem o módulo bipar. Não explica.
+4. **Bipe de leitura de tag.** O buzzer existe para acusar leitura, mas o módulo não inicia
+   inventário sozinho ao ligar. Improvável.
+
+Roteiro para a próxima energização, nesta ordem: (1) plugar e só ouvir por 15 s, contando os
+bipes — um e silêncio, boot normal; repetidos, reinício em loop; esparsos, mexer nos jumpers
+de alimentação; (2) se for loop, trocar para porta USB 3 direto no PC e o cabo que funcionou
+em 05/09, depois fonte externa; (3) com o módulo estável, gravar o `diag_r200` e ler o ciclo —
+no monitor, `RX2 em repouso` caindo a `0` a cada reboot conta os reinícios sem depender do
+ouvido.
+
 ## 9. Próximos passos
 
 **Pela bancada Debian (seção 2c) — não depende de solda:**
@@ -359,7 +397,8 @@ As duas dependem agora do `J3` com contato firme.
 
 **Pelo ESP32 — depende de solda, e é o que leva ao aplicativo:**
 
-- [ ] **Soldar** 4 pinos em `J3` e 1 pino no furo `5V` (ferro de solda ou assistência técnica)
+- [x] **Soldar** 4 pinos em `J3` e 1 pino no furo `5V` (feito em assistência técnica, seção 8c)
+- [ ] Energizar e contar os bipes do boot; se reiniciar em série, fonte externa de 5 V (seção 8c)
 - [ ] Gravar `diag_r200` e ler um ciclo: `RX2 em repouso = 1` fixo e o frame `BB 01 03 ...` limpo em uma velocidade
 - [ ] Ajustar `BAUD_PADRAO` no `teste_r200.py` e `BAUD` no `ponte_uart.ino` se a velocidade não for 115200
 - [ ] Gravar `ponte_uart` e repetir o inventário pela porta do ESP32
