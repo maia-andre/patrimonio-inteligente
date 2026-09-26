@@ -403,6 +403,9 @@ ouvido.
 
 Mesma montagem de 21/09, sem mudança nenhuma: `5V` pelo `VIN`, USB do ESP32 no PC (COM3),
 antena de painel no `CON1`, micro-USB do R200 solto.
+Fotos da montagem que funcionou: `docs/Foto 9` (verso) e `docs/Foto 10` (frente) — três
+Dupont no `J3` (o pino `3V3` fica livre) e um no `5V` do `J2`. Neste cabo o fio do `5V` é
+**preto**; não confundir com `GND` ao remontar.
 
 **Os bipes não eram reinício.** Ao plugar, o buzzer bipava sem parar. O ESP32 já estava com o
 `diag_r200` gravado (não com o `firmware.ino`, como supunha a seção 8c), e o bipe acompanhava o
