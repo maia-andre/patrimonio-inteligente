@@ -38,11 +38,16 @@ ESPERA_BOOT = 2.5  # s -- abrir a porta reinicia o modulo; ver abrir_porta()
 
 # ---------------------------------------------------------------- protocolo
 # Estrutura do frame MagicRF:
-#   BB | Type | Cmd | LenMSB | LenLSB | Params... | Checksum | 7E
+#   AA | Type | Cmd | LenMSB | LenLSB | Params... | Checksum | DD
 # Checksum = soma de (Type ... ultimo param), byte baixo.
+#
+# A documentacao do MagicRF usa BB e 7E. Este modulo (versao de hardware
+# "M100 26dBm V1.0") usa AA e DD e ignora frame com BB -- provado em
+# 26/09/2026 pelo diag_r200. O resto do frame e os codigos de comando sao
+# os mesmos.
 
-FRAME_HEAD = 0xBB
-FRAME_END = 0x7E
+FRAME_HEAD = 0xAA
+FRAME_END = 0xDD
 
 
 def montar_frame(tipo: int, cmd: int, params: bytes = b"") -> bytes:
@@ -135,15 +140,15 @@ def ler_ate_silencio(ser, silencio: float = 0.4, limite: float = 3.0) -> bytes:
 # Maior frame que o modulo emite: notificacao de tag com EPC de ate 62 bytes
 # (RSSI 1 + PC 2 + EPC 62 + CRC 2 = 67 params). Acima disso e cabecalho falso.
 MAX_PARAMS = 128
-FRAME_MINIMO = 7  # BB Type Cmd LenMSB LenLSB Checksum 7E
+FRAME_MINIMO = 7  # AA Type Cmd LenMSB LenLSB Checksum DD
 
 
 def extrair_frames(buffer: bytearray):
     """Consome o buffer e devolve os frames completos e validos encontrados.
 
-    Um 0xBB pode aparecer dentro do EPC ou do RSSI. Por isso nada e descartado
-    antes de validar o frame inteiro: se o candidato falha no tamanho, no 0x7E
-    ou no checksum, descarta-se so o primeiro byte e procura-se o proximo 0xBB.
+    Um 0xAA pode aparecer dentro do EPC ou do RSSI. Por isso nada e descartado
+    antes de validar o frame inteiro: se o candidato falha no tamanho, no 0xDD
+    ou no checksum, descarta-se so o primeiro byte e procura-se o proximo 0xAA.
     """
     frames = []
     while True:
@@ -228,7 +233,7 @@ def varrer_baud(porta: str):
 
     Manda a versao de hardware em cada candidata e verifica se volta um frame
     MagicRF valido. Velocidade errada devolve lixo que nao fecha checksum; a
-    certa devolve algo como  BB 01 03 ... 7E.
+    certa devolve algo como  AA 01 03 ... DD.
     """
     print(f"Varrendo velocidades em {porta}...\n")
     print(f"  espera de boot: {ESPERA_BOOT} s por velocidade")
