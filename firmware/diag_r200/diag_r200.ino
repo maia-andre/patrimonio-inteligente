@@ -16,6 +16,9 @@
 //   resposta BB 01 03 ... -> UART funcionando nos dois sentidos
 //   nenhuma resposta com RX2 = 1 -> o R200 nao esta recebendo: RXD solto,
 //                                    trocado, ou a linha presa pelo CH340
+//   "linha: ..." na pausa   -> algo passou no RX2 sem ser perguntado; as
+//                              duracoes decodificam em qualquer velocidade,
+//                              e um baixo de milissegundos e reinicio do R200
 //
 // Ligacao: docs/HARDWARE_R200.md, secao 3.
 
@@ -28,9 +31,12 @@ static const size_t N_BAUDS = sizeof(BAUDS) / sizeof(BAUDS[0]);
 static const int PINO_RX2 = 16;
 static const int PINO_TX2 = 17;
 static const int PINO_LED = 2;
+static const unsigned long PAUSA_MS = 2500;  // entre envios, vigiando a linha
 
-// BB 00 03 00 01 00 04 7E — versao de hardware
-static const uint8_t CMD_VERSAO_HW[] = {0xBB, 0x00, 0x03, 0x00, 0x01, 0x00, 0x04, 0x7E};
+static void vigiar_pausa(unsigned long tx_ms);
+
+// AA 00 03 00 01 00 04 DD — versao de hardware (este modulo usa AA...DD, nao BB...7E)
+static const uint8_t CMD_VERSAO_HW[] = {0xAA, 0x00, 0x03, 0x00, 0x01, 0x00, 0x04, 0xDD};
 
 void setup() {
     Serial.begin(BAUD);
@@ -86,6 +92,58 @@ void loop() {
     digitalWrite(PINO_LED, LOW);
     if (recebidos == 0) Serial.print("(sem resposta)");
     Serial.println();
+    vigiar_pausa(inicio);
     if (i == 0) Serial.println("----");
-    delay(600);
+}
+
+// Entre um envio e outro nada deveria acontecer na linha. Fica olhando o RX2
+// durante a pausa, como um analisador logico de pobre: guarda o instante de
+// cada transicao e imprime as duracoes, em microssegundos, alternando nivel
+// baixo e alto. Com isso da para decodificar no PC em qualquer velocidade, e
+// a menor duracao entrega o tempo de bit de quem esta falando. Se o R200
+// reiniciar, o TXD dele solta e o pull-down segura o RX2 em 0 por
+// milissegundos. Os bytes que a Serial2 pegar na velocidade do ciclo tambem
+// saem, como "fora de hora". A pausa longa separa os envios o bastante para
+// associar cada bipe a uma velocidade so.
+static const int MAX_TRANSICOES = 1500;
+static uint32_t transicoes[MAX_TRANSICOES];
+
+static void vigiar_pausa(unsigned long tx_ms) {
+    unsigned long inicio = millis();
+    int n = 0;
+    int nivel = 1;
+    // So o GPIO no laco, para nao perder pulso curto.
+    while (millis() - inicio < PAUSA_MS) {
+        int agora = gpio_get_level((gpio_num_t)PINO_RX2);
+        if (agora != nivel) {
+            nivel = agora;
+            if (n < MAX_TRANSICOES) transicoes[n++] = micros();
+        }
+    }
+
+    int bytes_fora = 0;
+    while (Serial2.available()) {
+        uint8_t b = Serial2.read();
+        if (bytes_fora == 0) Serial.print("   fora de hora: ");
+        if (b < 0x10) Serial.print('0');
+        Serial.print(b, HEX);
+        Serial.print(' ');
+        bytes_fora++;
+    }
+    if (bytes_fora > 0) Serial.println();
+
+    if (n > 0) {
+        Serial.print("   linha: ");
+        Serial.print(n);
+        Serial.print(" transicoes, a primeira em +");
+        Serial.print(transicoes[0] / 1000 - tx_ms);
+        Serial.println(" ms do TX");
+        Serial.print("   duracoes (us, baixo/alto alternados): ");
+        for (int k = 1; k < n; k++) {
+            Serial.print(transicoes[k] - transicoes[k - 1]);
+            Serial.print(' ');
+        }
+        Serial.println();
+        if (n == MAX_TRANSICOES) Serial.println("   (buffer cheio, resto perdido)");
+    }
 }
