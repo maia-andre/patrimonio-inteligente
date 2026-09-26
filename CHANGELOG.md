@@ -1,5 +1,15 @@
 # Changelog
 
+## Primeiras tags lidas (26/09/2026)
+O R200 leu as primeiras tags. Cadeia de hardware inteira provada, na mesma montagem de 21/09, sem trocar nada. Registro em `docs/HARDWARE_R200.md`, seção 8d.
+
+- **Os bipes não eram reinício.** O ESP32 já estava com o `diag_r200`, e o buzzer bipava no ritmo do ciclo dele. A linha `RX2` nunca caiu por mais de ~0,34 ms: o módulo não reiniciou nenhuma vez, e a hipótese de queda no `VIN` da seção 8c foi descartada.
+- **A moldura do protocolo é `AA … DD`, não `BB … 7E`.** O módulo respondia ~1,5 s depois do envio, fora da janela de leitura. `diag_r200` ganhou pausa de 2,5 s entre envios com captura das transições do `RX2`; decodificadas no PC, deram `AA 01 FF 00 01 05 06 DD` a 115200, com checksum certo. Com o comando refeito em `AA`/`DD`, o módulo respondeu de primeira: `M100 26dBm V1.0`, firmware `V2.3.5`, fabricante `MagicRf`. Códigos de comando, comprimento e checksum são os do MagicRF; só cabeçalho e fim mudam, e frame com `BB` é ignorado em silêncio.
+- **Velocidade confirmada: 115200 8N1.**
+- `firmware/teste_r200.py` passa a `AA`/`DD`; região 902–928 MHz e potência 18 dBm aceitas pela `ponte_uart`.
+- **Primeiras tags:** 3 EPCs distintos, cerca de 940 leituras em 15 s de inventário contínuo a 18 dBm, RSSI entre −59 e −40 dBm. Cerca de 20 leituras por segundo por tag, o que confirma a necessidade da janela de silêncio por EPC no firmware.
+- README: o módulo passa a "validado", a leitura de tag a "na bancada"; o gargalo do modo UHF deixa de ser hardware e passa a ser firmware (`uhf_r200.cpp`, Fase 2).
+
 ## Pinos soldados e a primeira energização (21/09/2026)
 A solda que faltava foi feita em assistência técnica: 4 pinos em `J3` e 1 no furo `5V` do `J2`. Fotos 6 a 8 em `docs/`. Registro em `docs/HARDWARE_R200.md`, seção 8c.
 

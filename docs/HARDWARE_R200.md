@@ -16,13 +16,13 @@ Cobre desde o primeiro teste do módulo no PC até a ligação definitiva com o 
 | **VCC/GND do R200 com fio soldado ou borne** | Jumper Dupont tem contato ruim e o módulo puxa picos acima de 500 mA na transmissão. Contato intermitente = reset no meio do inventário. |
 | **5 V de fonte separada, nunca do 3V3 do ESP32** | O regulador do ESP32 não sustenta o pico de TX. |
 | **GND sempre comum** | Sem terra em comum entre fonte, R200 e ESP32, a UART não funciona. |
-| **O R200 não é programável** | Firmware de fábrica no Impinj E710. Só se conversa com ele por serial. O Arduino IDE é para o ESP32, nunca para o R200. |
+| **O R200 não é programável** | Firmware de fábrica (o módulo se identifica como MagicRf M100, firmware V2.3.5 — seção 4). Só se conversa com ele por serial. O Arduino IDE é para o ESP32, nunca para o R200. |
 
 ---
 
 ## 1. Material
 
-- Módulo YPD-R200 (Impinj E710), SMA fêmea, 15–26 dBm, 902–928 MHz
+- Módulo YPD-R200 (anunciado como Impinj E710; ele próprio responde `M100 26dBm V1.0`, fabricante `MagicRf`), SMA fêmea, 15–26 dBm, 902–928 MHz
 - Antena cerâmica com rabicho SMA macho
 - Cabo micro-USB (acompanha o módulo)
 - ESP32 DevKit
@@ -215,40 +215,52 @@ Verificar se o micro-USB da placa e o header de pinos usam a **mesma** UART do R
 
 ## 4. Protocolo serial (MagicRF / Invelion)
 
-Estrutura do frame:
+Estrutura do frame **neste módulo**:
 
 ```
-BB | Type | Cmd | LenMSB | LenLSB | Params... | Checksum | 7E
+AA | Type | Cmd | LenMSB | LenLSB | Params... | Checksum | DD
 ```
 
 `Checksum` = soma dos bytes de `Type` até o último parâmetro, byte baixo.
 
-Velocidade: **115200 8N1 é a suposição de fábrica, ainda não confirmada** neste módulo. Duas ferramentas varrem 9600 a 230400 e mostram em qual delas volta um frame limpo `BB 01 03 ...`: `teste_r200.py PORTA --varrer`, do lado do PC, e o `diag_r200.ino`, quando o PC não alcança o módulo. Anotar aqui quando confirmar.
+**Cabeçalho `AA` e fim `DD`, não `BB` e `7E`** como na documentação do MagicRF e em quase todo exemplo da internet. Tipo, comando, comprimento, checksum e os códigos de comando são os mesmos; só a moldura muda. Frame com `BB` é ignorado em silêncio — foi isso que pareceu, até 26/09/2026, um módulo mudo (seção 8d). Quem pegar outra unidade do R200 deve testar as duas molduras antes de concluir qualquer coisa.
+
+Velocidade: **115200 8N1, confirmada em 26/09/2026.**
+
+Identificação que o módulo devolve: hardware `M100 26dBm V1.0`, firmware `V2.3.5`, fabricante `MagicRf`.
 
 ### Comandos usados no teste
 
 | Ação | Frame |
 |---|---|
-| Versão de hardware | `BB 00 03 00 01 00 04 7E` |
-| Versão de firmware | `BB 00 03 00 01 01 05 7E` |
-| Fabricante | `BB 00 03 00 01 02 06 7E` |
-| Região 902–928 MHz | `BB 00 07 00 01 02 0A 7E` |
-| Potência 18,00 dBm | `BB 00 B6 00 02 07 08 C7 7E` |
-| Potência 20,00 dBm | `BB 00 B6 00 02 07 D0 8F 7E` |
-| Inventário único | `BB 00 22 00 00 22 7E` |
-| Inventário contínuo | `BB 00 27 00 03 22 27 10 83 7E` |
-| Parar inventário | `BB 00 28 00 00 28 7E` |
+| Versão de hardware | `AA 00 03 00 01 00 04 DD` |
+| Versão de firmware | `AA 00 03 00 01 01 05 DD` |
+| Fabricante | `AA 00 03 00 01 02 06 DD` |
+| Região 902–928 MHz | `AA 00 07 00 01 02 0A DD` |
+| Potência 18,00 dBm | `AA 00 B6 00 02 07 08 C7 DD` |
+| Potência 20,00 dBm | `AA 00 B6 00 02 07 D0 8F DD` |
+| Inventário único | `AA 00 22 00 00 22 DD` |
+| Inventário contínuo | `AA 00 27 00 03 22 27 10 83 DD` |
+| Parar inventário | `AA 00 28 00 00 28 DD` |
 
 ### Notificação de tag (resposta a `0x22`)
 
 ```
-BB 02 22 [LenMSB] [LenLSB] [RSSI] [PC:2] [EPC:n] [CRC:2] [Checksum] 7E
+AA 02 22 [LenMSB] [LenLSB] [RSSI] [PC:2] [EPC:n] [CRC:2] [Checksum] DD
 ```
+
+Exemplo real, de 26/09/2026 (EPC de 12 bytes, RSSI `D7` = −41 dBm):
+
+```
+AA 02 22 00 11 D7 30 00 E2 80 69 15 00 00 40 1C FA E3 A2 31 67 0F 9E DD
+```
+
+Resposta de sucesso a comando de configuração: parâmetro `00` (ex.: `AA 01 07 00 01 00 09 DD` para a região). Erro: comando `FF` (ex.: `AA 01 FF 00 01 05 06 DD`, que o módulo manda ~1,5 s depois de receber um frame incompleto).
 
 `RSSI` é byte com sinal (valor > 127 → subtrair 256).
 O EPC começa após o PC de 2 bytes e termina 2 bytes antes do fim dos parâmetros (o CRC não faz parte do EPC).
 
-Este é o parser do `teste_r200.py`, a portar para `firmware/uhf_r200.cpp` na Fase 2. Se funciona no Python, funciona no ESP32. Detalhe que importa nos dois: `0xBB` pode aparecer dentro do EPC ou do RSSI, então nada é descartado antes de validar tamanho, `0x7E` e checksum do frame inteiro; frame inválido descarta só um byte e procura o próximo `0xBB`.
+Este é o parser do `teste_r200.py`, a portar para `firmware/uhf_r200.cpp` na Fase 2. Se funciona no Python, funciona no ESP32. Detalhe que importa nos dois: `0xAA` pode aparecer dentro do EPC ou do RSSI, então nada é descartado antes de validar tamanho, `0xDD` e checksum do frame inteiro; frame inválido descarta só um byte e procura o próximo `0xAA`.
 
 ---
 
@@ -274,13 +286,14 @@ Para bancada com potência baixa é o caminho normal. **Para o sistema em produ�
 | Sintoma | Causa provável |
 |---|---|
 | Porta não aparece na listagem | Driver do conversor USB. No Gerenciador de Dispositivos, "USB Serial" com código 28 confirma. O ESP32 usa outro chip (CH9102) e não serve de referência. Ver seção 2b. |
-| Porta abre mas `RX: (sem resposta)` | Baud errado (deve ser 115200); ou cabo USB só de carga, sem linhas de dados. Testar outro cabo. |
+| Porta abre mas `RX: (sem resposta)` | Moldura errada: este módulo só aceita `AA`…`DD` (seção 4) e ignora `BB`…`7E` sem responder; baud errado (deve ser 115200); ou cabo USB só de carga, sem linhas de dados. Testar outro cabo. |
 | `[aviso] checksum inválido` | Ruído na linha, cabo longo demais, ou disputa de UART (USB + ESP32 ao mesmo tempo). Um aviso isolado no meio de leituras boas é normal: o parser se ressincroniza sozinho. |
 | Responde a comandos mas não lê tag | Antena mal rosqueada; potência baixa demais; tag encostada em metal sem ser anti-metal; distância. Começar com a tag a 5–10 cm. |
 | Módulo reinicia durante o inventário | Alimentação insuficiente — pico de TX. Fonte externa, contato firme no VCC/GND. |
 | `diag_r200`: `RX2 em repouso` alterna entre `0` e `1` de uma linha para outra | Contato do `TXD` indo e vindo. Pino sem solda. |
 | `diag_r200`: respostas só com bytes como `00 00 00 80 C0 E0 F0 FC FE`, em todas as velocidades | Não é velocidade errada: é linha que fica em baixo e sobe devagar, assinatura de contato resistivo. Pino sem solda. Velocidade errada dá lixo diferente, e em uma das velocidades o frame sai limpo. |
 | Porta abre, `(sem resposta)` em **todas** as velocidades, e o módulo **bipa pouco depois de cada abertura de porta** | Abrir a porta reinicia o módulo, e o comando está sendo enviado em cima do boot. O bipe é de boot, não de leitura de tag: repete-se no mesmo instante em toda velocidade, enquanto leitura de tag dependeria do baud certo. Velocidade errada dá lixo, não silêncio — silêncio em **todas** não é problema de baud. O `abrir_porta()` do `teste_r200.py` espera `ESPERA_BOOT` (2,5 s) antes de qualquer comando. |
+| `diag_r200`: `RX2 em repouso = 1` fixo, `(sem resposta)` em todas as velocidades, e o buzzer bipando no ritmo do ciclo | Módulo vivo recebendo lixo nas velocidades erradas e devolvendo erro `FF` ~1,5 s depois, fora da janela de leitura. Olhar as linhas `linha:` da pausa e decodificar as durações; se sair `AA 01 FF ...`, a UART está boa e o problema é a moldura. Foi o caso de 26/09/2026. |
 | Monitor serial cheio de caracteres estranhos | Velocidade do monitor diferente de 115200, ou a placa está com o `ponte_uart` (que repassa bytes binários crus) em vez do `diag_r200`. |
 
 ---
@@ -291,7 +304,7 @@ Para bancada com potência baixa é o caminho normal. **Para o sistema em produ�
 |---|---|---|
 | `teste_r200.py` | PC, Python 3 + pyserial | Versão, região, potência, inventário único e contínuo com lista de EPCs. Com `--varrer`, descobre a velocidade da UART antes de tudo; com um número como segundo argumento, força a velocidade. Funciona pelo micro-USB do R200 (nativo no Linux, driver CH340 no Windows) ou pela porta do ESP32 com a ponte gravada. |
 | `ponte_uart/ponte_uart.ino` | ESP32 | Repassa bytes USB ↔ UART2 sem interpretar. Faz o ESP32 de conversor USB-serial para o R200 quando o Windows não tem driver do CH340. |
-| `diag_r200/diag_r200.ino` | ESP32 | Sem PC no meio: manda a versão de hardware em cada velocidade de 9600 a 230400, em ciclo, e imprime no monitor serial o nível de repouso do `RX2` (pull-up interno desligado, então `1` é prova real) e os bytes que voltam. Para mexer nos fios com o monitor aberto e para descobrir a velocidade do módulo. |
+| `diag_r200/diag_r200.ino` | ESP32 | Sem PC no meio: manda a versão de hardware em cada velocidade de 9600 a 230400, em ciclo, e imprime no monitor serial o nível de repouso do `RX2` (pull-up interno desligado, então `1` é prova real) e os bytes que voltam. Na pausa de 2,5 s entre envios grava as transições do `RX2` e imprime as durações em µs, o que permite decodificar no PC, em qualquer velocidade, algo que o módulo mande fora de hora. Para mexer nos fios com o monitor aberto e para descobrir a velocidade e a moldura do módulo. |
 
 Nenhuma das três é o firmware do projeto, que continua em `firmware/firmware.ino`. As duas do ESP32 compilam com o core esp32 3.3.11 para a placa `esp32:esp32:esp32doit-devkit-v1`.
 
@@ -386,6 +399,47 @@ em 05/09, depois fonte externa; (3) com o módulo estável, gravar o `diag_r200`
 no monitor, `RX2 em repouso` caindo a `0` a cada reboot conta os reinícios sem depender do
 ouvido.
 
+## 8d. Registro de bancada — 26/09/2026 (UART provada, primeiras tags)
+
+Mesma montagem de 21/09, sem mudança nenhuma: `5V` pelo `VIN`, USB do ESP32 no PC (COM3),
+antena de painel no `CON1`, micro-USB do R200 solto.
+
+**Os bipes não eram reinício.** Ao plugar, o buzzer bipava sem parar. O ESP32 já estava com o
+`diag_r200` gravado (não com o `firmware.ino`, como supunha a seção 8c), e o bipe acompanhava o
+ciclo do diagnóstico, cerca de uma vez a cada 6 s. `RX2 em repouso = 1` fixo; a captura das
+transições da linha nunca mostrou nível baixo mais longo que ~0,34 ms, então o R200 não
+reiniciou nenhuma vez. A hipótese 1 da seção 8c (queda no `VIN`) caiu: o `VIN` do ESP32 aguenta
+o módulo em repouso, nas consultas e em 15 s de inventário contínuo a 18 dBm.
+
+**O módulo respondia, fora da janela.** Com a pausa longa e a captura da linha no `diag_r200`,
+apareceram bytes ~1534 ms depois dos envios a 9600, 19200 e 57600, sempre iguais. As durações
+davam tempo de bit de ~8,7 µs — 115200 — e, decodificadas, `AA 01 FF 00 01 05 06 DD`, com
+checksum certo: erro, na moldura `AA`…`DD`. O módulo pegava no lixo das velocidades erradas algo
+que tomava por cabeçalho, esperava o resto do frame, desistia e respondia erro. Ao nosso comando
+correto a 115200, que começava com `BB`, não respondia nada.
+
+**Com `AA`…`DD`, tudo funcionou de primeira.** `diag_r200` com a versão de hardware em `AA`/`DD`:
+resposta limpa a 115200, `M100 26dBm V1.0`. Depois, `ponte_uart` gravada e `teste_r200.py`
+adaptado, pela COM3: firmware `V2.3.5`, fabricante `MagicRf`, região 902–928 MHz e potência
+18 dBm aceitas. Com a ponte, os bipes pararam: o módulo só recebe o que o PC manda.
+
+**Primeiras tags**, 18 dBm, 15 s de inventário contínuo, tags na mesa a distâncias variadas:
+
+| EPC | Leituras | RSSI |
+|---|---|---|
+| `E28069150000401CFAE3A231` | 339 | −46 a −40 dBm |
+| `E20047066BF06027F7A20109` | 304 | −59 a −52 dBm |
+| `E28068940000403592B56C31` | 300 | −56 a −52 dBm |
+
+Cerca de 20 leituras por segundo por tag — confirma que a janela de silêncio por EPC da Fase 2
+(seção 3) é obrigatória. O comando de parar respondeu `AA 01 28 00 01 00 2A DD`.
+
+Não conferido: em qual envio do ciclo exatamente o buzzer bipava. Tudo indica que acompanha a
+resposta de erro, mas ninguém associou bipe a linha do log.
+
+Cadeia inteira provada: fiação, alimentação pelo `VIN`, UART nos dois sentidos, protocolo, RF e
+leitura de EPC. O que falta é firmware, não hardware.
+
 ## 9. Próximos passos
 
 **Pela bancada Debian (seção 2c) — não depende de solda:**
@@ -398,10 +452,10 @@ ouvido.
 **Pelo ESP32 — depende de solda, e é o que leva ao aplicativo:**
 
 - [x] **Soldar** 4 pinos em `J3` e 1 pino no furo `5V` (feito em assistência técnica, seção 8c)
-- [ ] Energizar e contar os bipes do boot; se reiniciar em série, fonte externa de 5 V (seção 8c)
-- [ ] Gravar `diag_r200` e ler um ciclo: `RX2 em repouso = 1` fixo e o frame `BB 01 03 ...` limpo em uma velocidade
-- [ ] Ajustar `BAUD_PADRAO` no `teste_r200.py` e `BAUD` no `ponte_uart.ino` se a velocidade não for 115200
-- [ ] Gravar `ponte_uart` e repetir o inventário pela porta do ESP32
+- [x] Energizar e contar os bipes do boot — não era reinício, eram as respostas ao `diag_r200` (seção 8d)
+- [x] Gravar `diag_r200` e ler um ciclo: `RX2 em repouso = 1` fixo e `AA 01 03 ...` limpo a 115200 — a moldura é `AA`…`DD` (seções 4 e 8d)
+- [x] Velocidade confirmada em 115200; `teste_r200.py` passou para `AA`…`DD`
+- [x] Gravar `ponte_uart` e fazer o inventário pela porta do ESP32 — 3 tags lidas a 18 dBm (seção 8d)
 - [ ] Fase 2 — firmware do projeto lendo o R200 via UART2, saída BLE `EPC;` (RN-03), RSSI no log serial
 - [ ] Testar tags ABS anti-metal em superfície metálica real (datasheet não substitui teste físico)
 - [ ] Comparar alcance Higgs3 adesiva vs. ABS anti-metal, em papel e em metal

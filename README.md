@@ -154,8 +154,8 @@ No modo código de barras são aceitos **Code 128, Code 39 e QR Code** — EAN e
 | Leitura por NFC | ✅ **Funciona** | Reader mode NfcA/B/F/V; código via registro NDEF de texto ou UID |
 | Lançamento manual de código | ✅ **Funciona** | Campo de texto para o bem sem etiqueta legível; mesma lista e deduplicação |
 | Fluxo de leitura patrimonial | 🟡 **Simulado** | O ESP32 devolve um registro patrimonial fictício após 800 ms |
-| Módulo leitor UHF na bancada | 🟡 **Em validação** | YPD-R200 (Impinj E710) recebido em 05/09/2026; ligado ao ESP32 por UART e alimentado por ele, o módulo liga e responde, mas os pinos sem solda deformavam a conversa. O micro-USB da própria placa foi testado como alternativa sem solda em 19/09/2026 e descartado; os pinos foram soldados em 21/09/2026 e a primeira energização com eles ainda não foi medida. Registro em [`docs/HARDWARE_R200.md`](docs/HARDWARE_R200.md) |
-| Leitura de tag RFID UHF real | ❌ **Não existe** | Próximo passo: confirmar a velocidade da UART com os pinos soldados; o firmware ainda não fala com o módulo |
+| Módulo leitor UHF na bancada | ✅ **Validado** | YPD-R200 recebido em 05/09/2026, pinos soldados em 21/09/2026. Em 26/09/2026 a cadeia inteira foi provada: alimentação pelo `VIN` do ESP32, UART a 115200 nos dois sentidos, protocolo e RF. O módulo usa a moldura `AA … DD`, não a `BB … 7E` da documentação do MagicRF — era isso que o fazia parecer mudo. Registro em [`docs/HARDWARE_R200.md`](docs/HARDWARE_R200.md) |
+| Leitura de tag RFID UHF real | 🟡 **Na bancada** | Primeiras 3 tags lidas em 26/09/2026 pelo `teste_r200.py`, através da ponte serial, a 18 dBm. O firmware do projeto ainda não fala com o módulo, e nada chega ao aplicativo |
 | Persistência local (histórico) | ❌ **Não existe** | Planejado com Room |
 | Integração com sistema de patrimônio | ❌ **Não existe** | Depende de API do sistema municipal |
 | Camada de IA (reconciliação, anomalias) | ❌ **Não existe** | Especificada em [Onde entra a IA](#-onde-entra-a-inteligência-artificial) |
@@ -168,7 +168,7 @@ Isso significa que **toda a espinha dorsal — captura, transporte, fragmentaç�
 
 > ### 🚧 O gargalo, dito com todas as letras
 >
-> Até setembro de 2026 o **modo RFID UHF** — e apenas ele — estava travado pela aquisição do módulo leitor, cerca de **R$ 1.200** de bancada. O módulo (YPD-R200) chegou em 05/09/2026 e já conversa com o ESP32 pela UART; os pinos foram soldados em 21/09/2026; falta confirmar a velocidade da serial e trocar a simulação do firmware pela leitura real. O gargalo deixou de ser compra e deixou de ser solda: hoje é **tempo de bancada**.
+> Até setembro de 2026 o **modo RFID UHF** — e apenas ele — estava travado pela aquisição do módulo leitor, cerca de **R$ 1.200** de bancada. O módulo (YPD-R200) chegou em 05/09/2026 e os pinos foram soldados em 21/09/2026; em 26/09/2026 leu as primeiras tags pela bancada. Falta trocar a simulação do firmware pela leitura real. O gargalo deixou de ser compra, deixou de ser solda e deixou de ser hardware: hoje é **firmware**.
 >
 > Os modos **código de barras e NFC funcionam hoje, sem hardware nenhum**. E se o seu órgão já tem um leitor UHF de outro modelo, o relato comparativo vale muito — veja [Procuram-se parceiros](#-procuram-se-parceiros).
 
@@ -239,9 +239,9 @@ A lista de materiais abaixo vale **só para o modo RFID UHF**. Para conhecer o f
 
 > **Sobre o custo do módulo:** o preço varia bastante conforme a origem — importação direta sai consideravelmente mais barata que aquisição por fornecedor nacional dentro de processo formal de compra, onde incidem impostos e intermediação. Adotamos **~R$ 600** como referência de compra institucional. **Orce conforme a sua realidade de aquisição** — a bancada completa de validação fica em torno de **R$ 1.200**.
 
-**Especificações do YPD-R200:** chip Impinj E710 · protocolo EPCglobal UHF Class 1 Gen 2 / ISO 18000-6C · região configurável, usamos 902–928 MHz (US), que cobre as faixas liberadas pela ANATEL · alcance 0–6 m conforme antena, tag e ambiente · alimentação 5 V · potência RF ajustável 15–26 dBm · UART em 3,3 V, protocolo de frames MagicRF (`BB ... 7E`) · micro-USB com conversor CH340 embutido. Montagem, pinagem, protocolo e diagnóstico estão em [`docs/HARDWARE_R200.md`](docs/HARDWARE_R200.md).
+**Especificações do YPD-R200:** chip Impinj E710 · protocolo EPCglobal UHF Class 1 Gen 2 / ISO 18000-6C · região configurável, usamos 902–928 MHz (US), que cobre as faixas liberadas pela ANATEL · alcance 0–6 m conforme antena, tag e ambiente · alimentação 5 V · potência RF ajustável 15–26 dBm · UART em 3,3 V a 115200, protocolo de frames MagicRF — nesta unidade com moldura `AA ... DD`, não `BB ... 7E`; o módulo se identifica como `M100 26dBm V1.0`, fabricante `MagicRf` · micro-USB com conversor CH340 embutido. Montagem, pinagem, protocolo e diagnóstico estão em [`docs/HARDWARE_R200.md`](docs/HARDWARE_R200.md).
 
-> ⚠️ **Alimentação:** o R200 puxa picos acima de 500 mA na transmissão. **Nunca pelo pino 3.3V do ESP32.** Na bancada, o pino `VIN` do ESP32 (5 V da USB) sustentou o módulo nos testes de comando; para inventário contínuo, fonte externa de 5 V com GND compartilhado. E **antena conectada antes de energizar**, sempre: transmitir sem carga pode queimar o amplificador.
+> ⚠️ **Alimentação:** o R200 puxa picos acima de 500 mA na transmissão. **Nunca pelo pino 3.3V do ESP32.** Na bancada, o pino `VIN` do ESP32 (5 V da USB, porta do PC) sustentou o módulo nos comandos e em 15 s de inventário contínuo a 18 dBm; para potência maior e uso prolongado, fonte externa de 5 V com GND compartilhado. E **antena conectada antes de energizar**, sempre: transmitir sem carga pode queimar o amplificador.
 
 > ⚠️ **Pinos:** a placa do R200 vem sem pinos. **Solde-os.** Pino apenas encaixado no furo alimenta a placa, mas não sustenta a UART — aprendemos isso em uma tarde inteira de bancada. E o micro-USB da própria placa **não é atalho**: gastamos um segundo dia provando que o CH340 dela não entrega os dados do módulo ao PC, em velocidade nenhuma. Os dois becos sem saída estão documentados, com os sintomas, para você não repetir nenhum dos dois.
 
@@ -363,8 +363,8 @@ graph LR
 **Médio prazo — com o YPD-R200 na bancada (recebido em 05/09/2026)**
 - [x] Ligar o R200 ao ESP32 via UART2: fiação validada, módulo liga e responde
 - [x] Soldar os pinos do R200 (21/09/2026)
-- [ ] Confirmar a velocidade da UART com o `diag_r200`
-- [ ] Ler a primeira tag pelo `teste_r200.py` através da ponte serial
+- [x] Confirmar a velocidade da UART com o `diag_r200` — 115200, moldura `AA … DD` (26/09/2026)
+- [x] Ler a primeira tag pelo `teste_r200.py` através da ponte serial (26/09/2026)
 - [ ] Implementar os comandos de inventário do módulo no firmware (`uhf_r200.cpp`)
 - [ ] Substituir a mensagem simulada pelo EPC real lido da tag, no formato `EPC;`
 - [ ] Caracterizar leitura a diferentes distâncias, ângulos e materiais (metal e líquido degradam UHF); comparar Higgs3 adesiva e ABS anti-metal
