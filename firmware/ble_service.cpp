@@ -3,10 +3,10 @@
 #include <BLEServer.h>
 #include <BLEUtils.h>
 #include <BLE2902.h>
-#include "led_controller.h"
+#include <atomic>
 
-// Instância do controlador do LED para usarmos aqui
-extern LedController led;
+// Escrito pelo callback do BLE, consumido pelo loop()
+static std::atomic<uint8_t> comandoPendente{COMANDO_NENHUM};
 
 BLEServer* pServer = NULL;
 BLECharacteristic* pTxCharacteristic = NULL;
@@ -33,6 +33,18 @@ class MyServerCallbacks: public BLEServerCallbacks {
     }
 };
 
+ComandoScanner interpretarComando(const String& texto) {
+    String comando = texto;
+    comando.trim();
+    if (comando == "SCAN_START" || comando == "LED_ON") return COMANDO_SCAN_START;
+    if (comando == "SCAN_STOP" || comando == "LED_OFF") return COMANDO_SCAN_STOP;
+    return COMANDO_NENHUM;
+}
+
+ComandoScanner lerComandoPendente() {
+    return (ComandoScanner)comandoPendente.exchange(COMANDO_NENHUM);
+}
+
 // Callbacks para receber mensagens na característica RX
 class MyCallbacks: public BLECharacteristicCallbacks {
     void onWrite(BLECharacteristic *pCharacteristic) {
@@ -42,19 +54,14 @@ class MyCallbacks: public BLECharacteristicCallbacks {
         Serial.print("[RX] Recebido: ");
         Serial.println(rxValue);
 
-        // Lógica de controle: simula scanner patrimonial
-        if (rxValue == "LED_ON") {
-            led.turnOn();
-            Serial.println("[SCANNER] Escaneando...");
-            // Simula um pequeno atraso de leitura do leitor RFID UHF
-            delay(800);
-            // Envia a mensagem simulada de ativo encontrado
-            sendBLELongMessage("Placa Patrimonial 147258 - Notebook Positivo encontrado e registrado no inventario da unidade 124 - Departamento de Planejamento e Gestao de Recursos.");
-        } 
-        else if (rxValue == "LED_OFF") {
-            led.turnOff();
-            Serial.println("[SCANNER] Desligado");
-            sendBLENotification("SCANNER_OFF");
+        // Só registra o comando: este callback roda na tarefa do BLE, e
+        // quem lê o R200 e envia as tags é o loop(). Bloquear aqui travaria
+        // a pilha BLE durante a leitura contínua.
+        ComandoScanner comando = interpretarComando(rxValue);
+        if (comando != COMANDO_NENHUM) {
+            comandoPendente = comando;
+        } else {
+            Serial.println("[RX] Comando desconhecido, ignorado");
         }
       }
     }
