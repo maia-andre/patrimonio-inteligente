@@ -153,22 +153,22 @@ No modo código de barras são aceitos **Code 128, Code 39 e QR Code** — EAN e
 | Leitura por código de barras (câmera) | ✅ **Funciona** | CameraX + ZXing: Code 128, Code 39 e QR Code, sem Google Play Services |
 | Leitura por NFC | ✅ **Funciona** | Reader mode NfcA/B/F/V; código via registro NDEF de texto ou UID |
 | Lançamento manual de código | ✅ **Funciona** | Campo de texto para o bem sem etiqueta legível; mesma lista e deduplicação |
-| Fluxo de leitura patrimonial | 🟡 **Simulado** | O ESP32 devolve um registro patrimonial fictício após 800 ms |
+| Fluxo de leitura patrimonial | ✅ **Funciona na bancada** | Desde 29/09/2026 o ESP32 lê o R200 e envia o EPC real ao aplicativo, no formato `EPC;`. A simulação saiu do firmware |
 | Módulo leitor UHF na bancada | ✅ **Validado** | YPD-R200 recebido em 05/09/2026, pinos soldados em 21/09/2026. Em 26/09/2026 a cadeia inteira foi provada: alimentação pelo `VIN` do ESP32, UART a 115200 nos dois sentidos, protocolo e RF. O módulo usa a moldura `AA … DD`, não a `BB … 7E` da documentação do MagicRF — era isso que o fazia parecer mudo. Registro em [`docs/HARDWARE_R200.md`](docs/HARDWARE_R200.md) |
-| Leitura de tag RFID UHF real | 🟡 **Na bancada** | Primeiras 3 tags lidas em 26/09/2026 pelo `teste_r200.py`, através da ponte serial, a 18 dBm. O firmware do projeto ainda não fala com o módulo, e nada chega ao aplicativo |
+| Leitura de tag RFID UHF real | ✅ **Ponta a ponta, na bancada** | Em 29/09/2026 uma tag real foi lida pelo firmware do projeto e conferida no aplicativo ([foto](docs/Foto%2011%20Teste%20de%20detec%C3%A7%C3%A3o%20de%20tag%20real%20no%20app%20com%20sucesso.jpeg)). A 18 dBm, a leitura começa a cerca de meio metro. Falta caracterizar alcance, ângulo e material; o buzzer da placa apita a cada leitura e só sai com solda |
 | Persistência local (histórico) | ❌ **Não existe** | Planejado com Room |
 | Integração com sistema de patrimônio | ❌ **Não existe** | Depende de API do sistema municipal |
 | Camada de IA (reconciliação, anomalias) | ❌ **Não existe** | Especificada em [Onde entra a IA](#-onde-entra-a-inteligência-artificial) |
 
-### O que exatamente está simulado
+### Da simulação à leitura real
 
-Enquanto o módulo leitor não existia, implementamos o **fluxo completo com o hardware que já tínhamos**. Ao acionar "Escanear", o ESP32 acende o LED (simulando a antena UHF ativa), aguarda 800 ms (simulando o tempo de leitura) e transmite via BLE um registro patrimonial fictício, que o app remonta e exibe na tela. Esse é o firmware que está no repositório hoje.
+Enquanto o módulo leitor não existia, implementamos o **fluxo completo com o hardware que já tínhamos**: ao acionar "Escanear", o ESP32 acendia o LED, aguardava 800 ms e transmitia via BLE um registro patrimonial fictício, que o app remontava e exibia na tela.
 
-Isso significa que **toda a espinha dorsal — captura, transporte, fragmentação, remontagem e exibição — está construída e validada**. O que falta é substituir a string fictícia pelo EPC real vindo da antena. É uma troca de origem de dado, não uma reescrita — e o módulo que fornece esse dado chegou à bancada em 05/09/2026.
+Em 29/09/2026 a string fictícia deu lugar ao EPC real vindo da antena, e **o aplicativo não precisou de nenhuma mudança** — a espinha dorsal de captura, transporte, fragmentação, remontagem e deduplicação construída na simulação recebeu o dado verdadeiro como estava. Era uma troca de origem de dado, não uma reescrita, como previsto.
 
 > ### 🚧 O gargalo, dito com todas as letras
 >
-> Até setembro de 2026 o **modo RFID UHF** — e apenas ele — estava travado pela aquisição do módulo leitor, cerca de **R$ 1.200** de bancada. O módulo (YPD-R200) chegou em 05/09/2026 e os pinos foram soldados em 21/09/2026; em 26/09/2026 leu as primeiras tags pela bancada. Falta trocar a simulação do firmware pela leitura real. O gargalo deixou de ser compra, deixou de ser solda e deixou de ser hardware: hoje é **firmware**.
+> Até setembro de 2026 o **modo RFID UHF** — e apenas ele — estava travado pela aquisição do módulo leitor, cerca de **R$ 1.200** de bancada. O módulo (YPD-R200) chegou em 05/09/2026, os pinos foram soldados em 21/09/2026, em 26/09/2026 leu as primeiras tags pela bancada e em 29/09/2026 o EPC real chegou ao aplicativo pelo firmware do projeto. O gargalo deixou de ser compra, solda, hardware e firmware: hoje é **caracterização** — alcance, ângulo, metal e líquido, com etiquetas de verdade em bens de verdade.
 >
 > Os modos **código de barras e NFC funcionam hoje, sem hardware nenhum**. E se o seu órgão já tem um leitor UHF de outro modelo, o relato comparativo vale muito — veja [Procuram-se parceiros](#-procuram-se-parceiros).
 
@@ -258,13 +258,19 @@ Ferramentas de bancada do módulo UHF, à parte do firmware: `firmware/teste_r20
 
 ```
 [BOOT] ESP32 iniciado
-[BOOT] Inicializando BLE...
+[BOOT] Inicializando R200...
+[UHF] Hardware: M100 26dBm V1.0
+[UHF] Regiao 902-928 MHz: ok
+[UHF] Potencia 18,00 dBm: ok
 [BOOT] BLE iniciado. Aguardando conexões...
 [BLE] Dispositivo conectado!
 [RX] Recebido: LED_ON
-[SCANNER] Escaneando...
-[TX] Enviando mensagem longa (140 bytes)...
+[UHF] Inventario iniciado
+[TAG] E28068940000403592B56C31  RSSI -66 dBm  (1 leituras)
+[TX] Enviando mensagem longa (25 bytes)...
 ```
+
+Sem celular, os mesmos comandos funcionam pelo Serial Monitor: digite `SCAN_START` ou `SCAN_STOP` e Enter.
 
 ### Aplicativo Android
 
@@ -314,22 +320,22 @@ O firmware expõe um **Nordic UART Service (NUS)**, padrão de fato para comunic
 
 | Comando (escrito em RX) | Ação no ESP32 | Resposta em TX |
 |---|---|---|
-| `LED_ON` | Aciona a varredura: acende o LED (GPIO 2), aguarda 800 ms | Registro patrimonial fragmentado, terminado por `__END__` |
-| `LED_OFF` | Encerra a varredura, apaga o LED | `SCANNER_OFF` |
+| `SCAN_START` (ou `LED_ON`) | Inicia o inventário contínuo do R200 e acende o LED (GPIO 2) | Cada EPC lido, como `EPC;`, fragmentado e terminado por `__END__`; a mesma tag no máximo a cada 3 s |
+| `SCAN_STOP` (ou `LED_OFF`) | Para o inventário, apaga o LED | `SCANNER_OFF` |
+
+Se o celular desconecta com o inventário ativo, o firmware para o R200 sozinho. O RSSI de cada leitura vai só para o log serial.
 
 ### Fragmentação de mensagens longas
 
-O BLE transporta cerca de **20 bytes úteis por notificação** na configuração padrão, e um registro patrimonial tem ~140 caracteres. O firmware quebra a mensagem em blocos de 20 bytes com intervalo de 50 ms entre eles e encerra com o marcador `__END__`; o app acumula os fragmentos e só renderiza ao receber o marcador.
+O BLE transporta cerca de **20 bytes úteis por notificação** na configuração padrão, e um EPC de 96 bits com o separador já tem 25 caracteres. O firmware quebra a mensagem em blocos de 20 bytes com intervalo de 50 ms entre eles e encerra com o marcador `__END__`; o app acumula os fragmentos e só interpreta ao receber o marcador.
 
 ```
-TX → "Placa Patrimonial 14"
-TX → "7258 - Notebook Posi"
-TX → "tivo encontrado e re"
-...
-TX → "__END__"          ← app remonta e exibe
+TX → "E28068940000403592B5"
+TX → "6C31;"
+TX → "__END__"          ← app remonta: código = EPC, descrição vazia
 ```
 
-> 🔨 **Débito técnico assumido:** os comandos ainda se chamam `LED_ON`/`LED_OFF`, herança da fase de aprendizado do BLE. Devem ser renomeados para `SCAN_START`/`SCAN_STOP`, e a resposta deve virar um payload estruturado (EPC + metadados) em vez de texto corrido. **O lado do aplicativo já aceita o payload estruturado `codigo;descricao`** — o parser é tolerante aos dois formatos —, restando o firmware passar a emiti-lo. Está mapeado — veja as issues abertas.
+> 🔨 **Débito técnico restante:** o firmware já fala `SCAN_START`/`SCAN_STOP` e emite o payload estruturado `codigo;descricao` (RN-03), mas o aplicativo ainda envia `LED_ON`/`LED_OFF`, herança da fase de aprendizado do BLE; o firmware aceita os dois nomes até o app ser atualizado.
 
 ---
 
@@ -346,7 +352,7 @@ graph LR
     style F1 fill:#fef3c7,stroke:#b45309,stroke-width:3px
 ```
 
-**📍 Estamos aqui:** validando — a base tecnológica está construída e o módulo leitor está na bancada, ligado ao ESP32, na etapa de montagem física.
+**📍 Estamos aqui:** validando — a leitura real funciona ponta a ponta na bancada (tag → R200 → ESP32 → BLE → aplicativo); a etapa agora é caracterizar alcance e materiais.
 
 <details>
 <summary><b>Detalhamento das tarefas por horizonte</b></summary>
@@ -355,9 +361,9 @@ graph LR
 - [x] Modos de captura sem hardware: código de barras (CameraX + ZXing) e NFC (reader mode)
 - [x] Camada de domínio com porta única de captura, ViewModel e lista de inventário com deduplicação e contador
 - [x] Payload estruturado `codigo;descricao` aceito no lado do aplicativo (parser tolerante aos dois formatos)
-- [ ] Enriquecer a simulação do firmware com múltiplos ativos
 - [ ] Persistência local com Room (histórico de leituras)
-- [ ] Renomear comandos BLE (`SCAN_START`/`SCAN_STOP`) e emitir o payload estruturado no firmware
+- [x] Firmware com comandos `SCAN_START`/`SCAN_STOP` e payload estruturado `EPC;` (29/09/2026)
+- [ ] Aplicativo enviar `SCAN_START`/`SCAN_STOP` em vez de `LED_ON`/`LED_OFF`
 - [ ] Refatorar a UI de painel de botões para tela de auditoria e inventário
 
 **Médio prazo — com o YPD-R200 na bancada (recebido em 05/09/2026)**
@@ -365,8 +371,8 @@ graph LR
 - [x] Soldar os pinos do R200 (21/09/2026)
 - [x] Confirmar a velocidade da UART com o `diag_r200` — 115200, moldura `AA … DD` (26/09/2026)
 - [x] Ler a primeira tag pelo `teste_r200.py` através da ponte serial (26/09/2026)
-- [ ] Implementar os comandos de inventário do módulo no firmware (`uhf_r200.cpp`)
-- [ ] Substituir a mensagem simulada pelo EPC real lido da tag, no formato `EPC;`
+- [x] Implementar os comandos de inventário do módulo no firmware (`uhf_r200.cpp`) (29/09/2026)
+- [x] Substituir a mensagem simulada pelo EPC real lido da tag, no formato `EPC;` — conferido no aplicativo (29/09/2026)
 - [ ] Caracterizar leitura a diferentes distâncias, ângulos e materiais (metal e líquido degradam UHF); comparar Higgs3 adesiva e ABS anti-metal
 
 **Longo prazo — produção**
