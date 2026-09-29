@@ -1,0 +1,70 @@
+name: Android CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: android-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  unit-tests:
+    name: Testes unitarios + lint
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
+
+      - name: Dar permissao ao gradlew
+        run: chmod +x ./gradlew
+
+      - name: Rodar testes unitarios
+        run: ./gradlew testDebugUnitTest --no-daemon
+
+      - name: Rodar lint (Android)
+        run: ./gradlew lintDebug --no-daemon
+        continue-on-error: true
+        # continue-on-error na 1a rodada: o autor ainda nao definiu baseline.
+        # Retirar apos o baseline lint ser mesclado.
+
+      - name: Upload relatorios de teste
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: relatorios-de-teste
+          path: |
+            app/build/reports/tests/
+            app/build/reports/lint-results-debug.html
+          if-no-files-found: ignore
+
+  firmware-lint:
+    name: Firmware (verificacao estatica)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verificar que arquivos .ino existem
+        run: |
+          test -f firmware/firmware.ino
+          test -f firmware/diag_r200/diag_r200.ino
+          test -f firmware/ponte_uart/ponte_uart.ino
+          echo "Firmware presente. Compilacao requer arduino-cli + core ESP32."
