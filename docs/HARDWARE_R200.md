@@ -87,6 +87,9 @@ com internet pelo roteador do celular.
 > placa não entrega os dados do módulo ao PC (seção 8b). O roteiro continua aqui porque a
 > preparação da máquina e as armadilhas do Debian valem para a bancada pela ponte do ESP32,
 > que é o caminho que funciona.
+>
+> Para demonstrar a leitura rodando no Debian com o firmware da Fase 2, o roteiro
+> curto está em `docs/DEMO_DEBIAN.md`.
 
 **Preparar a máquina** (clone raso, para poupar o plano de dados):
 
