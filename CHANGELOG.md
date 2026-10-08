@@ -1,5 +1,13 @@
 # Changelog
 
+## CI, dependabot e política de segurança (08/10/2026)
+Primeiro pull request externo do projeto (#1, de Marcos Méndez), com ajustes da revisão.
+
+- **`.github/workflows/android-ci.yml`**: a cada push e PR na `main`, roda os testes unitários e o lint do app (JDK 17) e compila os três sketches do firmware com `arduino-cli` e o core `esp32:esp32` 3.3.11, placa `esp32doit-devkit-v1`, a da bancada. O `setup-gradle` valida o `gradle-wrapper.jar` antes de rodar.
+- **`.github/dependabot.yml`**: atualizações mensais de dependências Gradle e de GitHub Actions, até 3 PRs abertos. O Kotlin fica de fora: acompanha a versão embutida no AGP e sobe junto com ele, à mão.
+- **`SECURITY.md`**: o que o projeto é e não é hoje, como reportar uma falha pelo canal privado do GitHub e os prazos de resposta. Declara como limitação conhecida o serviço BLE do ESP32 sem autenticação.
+- README e CONTRIBUTING apontam para a política de segurança e para o CI.
+
 ## EPC real no aplicativo (29/09/2026)
 O firmware do projeto passou a ler o R200, e uma tag real chegou ao aplicativo e foi conferida na lista, sem nenhuma mudança no app. Registro em `docs/HARDWARE_R200.md`, seção 8e; tela do app em `docs/Foto 11`.
 

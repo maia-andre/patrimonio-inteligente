@@ -399,7 +399,7 @@ Este projeto vale muito mais integrado do que replicado. Se qualquer um dos iten
 | 🏫 **É de universidade ou instituto de pesquisa** | Caracterização de RFID em ambiente real, OCR de placas, reconciliação de entidades |
 | ⚖️ **Já publicou software público** | Nos orientar sobre o trâmite de autorização institucional de publicação |
 
-Veja [CONTRIBUTING.md](CONTRIBUTING.md) para o processo. **Relatos de uso e de fracasso são tão bem-vindos quanto código** — saber que o alcance despencou num almoxarifado metálico vale mais para o próximo município do que um pull request.
+Veja [CONTRIBUTING.md](CONTRIBUTING.md) para o processo e [SECURITY.md](SECURITY.md) para reportar uma falha de segurança pelo canal privado, não em issue pública. **Relatos de uso e de fracasso são tão bem-vindos quanto código** — saber que o alcance despencou num almoxarifado metálico vale mais para o próximo município do que um pull request.
 
 ---
 
