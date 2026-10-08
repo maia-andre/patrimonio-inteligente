@@ -3,13 +3,12 @@ updates:
   - package-ecosystem: gradle
     directory: /
     schedule:
-      interval: weekly
-      day: monday
-      time: "06:00"
+      interval: monthly
       timezone: America/Sao_Paulo
-    open-pull-requests-limit: 5
-    labels:
-      - dependencies
+    open-pull-requests-limit: 3
+    ignore:
+      # O Kotlin acompanha a versão embutida no AGP; sobe junto com ele, à mão.
+      - dependency-name: "org.jetbrains.kotlin*"
     commit-message:
       prefix: "chore(deps)"
       include: scope
@@ -18,9 +17,6 @@ updates:
     directory: /
     schedule:
       interval: monthly
-    labels:
-      - dependencies
-      - ci
     commit-message:
       prefix: "chore(ci)"
       include: scope
