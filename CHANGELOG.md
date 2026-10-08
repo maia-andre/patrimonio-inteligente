@@ -1,5 +1,17 @@
 # Changelog
 
+## EPC real no aplicativo (29/09/2026)
+O firmware do projeto passou a ler o R200, e uma tag real chegou ao aplicativo e foi conferida na lista, sem nenhuma mudança no app. Registro em `docs/HARDWARE_R200.md`, seção 8e; tela do app em `docs/Foto 11`.
+
+- **`firmware/uhf_r200.cpp`**: o protocolo do `teste_r200.py` portado para o ESP32 — moldura `AA … DD` a 115200 na UART2, o mesmo parser que não se perde com `0xAA` dentro do EPC, e o boot que espera o módulo responder e configura região 902–928 MHz e 18 dBm sozinho. Inventário contínuo, rearmado se a UART ficar 3 s em silêncio.
+- **`ble_service.cpp` sem bloqueio**: o callback do BLE só registra o comando; quem lê o módulo e envia é o `loop()`. Sai a simulação com `delay(800)` e texto fixo.
+- Comandos `SCAN_START`/`SCAN_STOP`, com `LED_ON`/`LED_OFF` como sinônimos — é o que o app ainda manda. Os mesmos comandos pela Serial USB, para testar sem celular. Payload `EPC;` da RN-03, RSSI só no log serial. Celular desconectado para o inventário.
+- **Janela de 3 s por EPC**: o módulo lê a mesma tag de 20 a 37 vezes por segundo; o firmware envia uma vez por janela e conta as leituras agrupadas no log.
+- Na bancada: primeira leitura a ~47 cm da antena em linha reta, −71 dBm, a 18 dBm. O `VIN` segurou BLE e inventário juntos, sem `Brownout`.
+- **O buzzer da placa apita a cada leitura**, dezenas de vezes por segundo, e o firmware não o controla. Não há comando serial conhecido; o caminho é dessoldar `R9` ou `R11`. Registrado como sintoma na seção 6.
+- Dois tropeços do aplicativo, para investigar: a conexão só veio depois de passar pelo modo Manual, e nenhum `LED_OFF` foi visto no ESP32.
+- README: fluxo de leitura e leitura de tag passam a funcionar ponta a ponta na bancada; protocolo BLE com os comandos e o payload novos; o gargalo do modo UHF deixa de ser firmware e passa a ser caracterização.
+
 ## Primeiras tags lidas (26/09/2026)
 O R200 leu as primeiras tags. Cadeia de hardware inteira provada, na mesma montagem de 21/09, sem trocar nada. Registro em `docs/HARDWARE_R200.md`, seção 8d.
 

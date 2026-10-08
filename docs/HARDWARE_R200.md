@@ -3,7 +3,7 @@
 Documento de bancada para o projeto **patrimônio-inteligente**.
 Cobre desde o primeiro teste do módulo no PC até a ligação definitiva com o ESP32.
 
-**Onde isso se encaixa no repositório.** O firmware em `firmware/` hoje só simula o leitor: o comando BLE `LED_ON` acende o LED e devolve um texto fixo, fragmentado em pacotes de 20 bytes e fechado por `__END__` (`ble_service.cpp`). O aplicativo Android já interpreta o payload `codigo;descricao` (RN-03 da `docs/spec.md`, parser em `domain/InterpretadorPayloadUhf.kt`). A Fase 2 deste documento é o que faz o firmware trocar a simulação pelo R200 e emitir esse formato.
+**Onde isso se encaixa no repositório.** Desde 29/09/2026 o firmware em `firmware/` lê o R200 de verdade: `uhf_r200.cpp` fala com o módulo pela UART2, e o `loop()` envia cada EPC ao aplicativo pelo BLE no formato `EPC;` da RN-03 (`docs/spec.md`, parser em `domain/InterpretadorPayloadUhf.kt`), fragmentado em pacotes de 20 bytes e fechado por `__END__`. Até ali o comando `LED_ON` só acendia o LED e devolvia um texto fixo. A Fase 2 deste documento é essa troca; o registro do dia em que ela funcionou está na seção 8e.
 
 ---
 
@@ -87,6 +87,9 @@ com internet pelo roteador do celular.
 > placa não entrega os dados do módulo ao PC (seção 8b). O roteiro continua aqui porque a
 > preparação da máquina e as armadilhas do Debian valem para a bancada pela ponte do ESP32,
 > que é o caminho que funciona.
+>
+> Para demonstrar a leitura rodando no Debian com o firmware da Fase 2, o roteiro
+> curto está em `docs/DEMO_DEBIAN.md`.
 
 **Preparar a máquina** (clone raso, para poupar o plano de dados):
 
@@ -191,6 +194,8 @@ Por ordem de preferência:
 
 ### O que o firmware da Fase 2 precisa entregar
 
+Entregue em 29/09/2026, item por item (seção 8e). Fica a lista como especificação do que o firmware garante.
+
 - Novo módulo `firmware/uhf_r200.h/.cpp`: montagem de frame, parser (o mesmo do `teste_r200.py`) e controle de inventário sobre `Serial2` a 115200.
 - `ble_service.cpp` sem bloqueio: o comando BLE só muda um estado; quem lê a UART e envia pelo BLE é o `loop()`. Hoje o `onWrite` faz `delay(800)` e envia dentro do callback, o que não serve para leitura contínua.
 - Comandos `SCAN_START`/`SCAN_STOP`, mantendo `LED_ON`/`LED_OFF` como sinônimos até o aplicativo ser atualizado.
@@ -294,6 +299,8 @@ Para bancada com potência baixa é o caminho normal. **Para o sistema em produ�
 | `diag_r200`: respostas só com bytes como `00 00 00 80 C0 E0 F0 FC FE`, em todas as velocidades | Não é velocidade errada: é linha que fica em baixo e sobe devagar, assinatura de contato resistivo. Pino sem solda. Velocidade errada dá lixo diferente, e em uma das velocidades o frame sai limpo. |
 | Porta abre, `(sem resposta)` em **todas** as velocidades, e o módulo **bipa pouco depois de cada abertura de porta** | Abrir a porta reinicia o módulo, e o comando está sendo enviado em cima do boot. O bipe é de boot, não de leitura de tag: repete-se no mesmo instante em toda velocidade, enquanto leitura de tag dependeria do baud certo. Velocidade errada dá lixo, não silêncio — silêncio em **todas** não é problema de baud. O `abrir_porta()` do `teste_r200.py` espera `ESPERA_BOOT` (2,5 s) antes de qualquer comando. |
 | `diag_r200`: `RX2 em repouso = 1` fixo, `(sem resposta)` em todas as velocidades, e o buzzer bipando no ritmo do ciclo | Módulo vivo recebendo lixo nas velocidades erradas e devolvendo erro `FF` ~1,5 s depois, fora da janela de leitura. Olhar as linhas `linha:` da pausa e decodificar as durações; se sair `AA 01 FF ...`, a UART está boa e o problema é a moldura. Foi o caso de 26/09/2026. |
+| Buzzer apita sem parar durante o inventário | Normal: a placa apita a cada leitura, e o módulo lê a mesma tag dezenas de vezes por segundo. A janela de 3 s do firmware vale só para o envio pelo BLE. Não há comando serial conhecido para desligar o buzzer; o caminho documentado é dessoldar `R9` ou `R11` da placa. Ver seção 8e. |
+| Aplicativo não acha o `RFID-POC-ESP32` ("Tempo de escaneamento esgotado") | Visto em 29/09/2026 com o firmware anunciando normalmente: trocar para o modo Manual e voltar ao UHF antes de "Conectar scanner" resolveu. Localização do celular ligada. Causa no aplicativo ainda não investigada. |
 | Monitor serial cheio de caracteres estranhos | Velocidade do monitor diferente de 115200, ou a placa está com o `ponte_uart` (que repassa bytes binários crus) em vez do `diag_r200`. |
 
 ---
@@ -306,7 +313,7 @@ Para bancada com potência baixa é o caminho normal. **Para o sistema em produ�
 | `ponte_uart/ponte_uart.ino` | ESP32 | Repassa bytes USB ↔ UART2 sem interpretar. Faz o ESP32 de conversor USB-serial para o R200 quando o Windows não tem driver do CH340. |
 | `diag_r200/diag_r200.ino` | ESP32 | Sem PC no meio: manda a versão de hardware em cada velocidade de 9600 a 230400, em ciclo, e imprime no monitor serial o nível de repouso do `RX2` (pull-up interno desligado, então `1` é prova real) e os bytes que voltam. Na pausa de 2,5 s entre envios grava as transições do `RX2` e imprime as durações em µs, o que permite decodificar no PC, em qualquer velocidade, algo que o módulo mande fora de hora. Para mexer nos fios com o monitor aberto e para descobrir a velocidade e a moldura do módulo. |
 
-Nenhuma das três é o firmware do projeto, que continua em `firmware/firmware.ino`. As duas do ESP32 compilam com o core esp32 3.3.11 para a placa `esp32:esp32:esp32doit-devkit-v1`.
+Nenhuma das três é o firmware do projeto, que continua em `firmware/firmware.ino` e, desde 29/09/2026, fala com o R200 pelo `uhf_r200.cpp` (seção 8e). O firmware aceita os comandos também pela Serial USB (`SCAN_START`/`SCAN_STOP` seguidos de Enter, no monitor a 115200), o que testa a leitura inteira sem celular. As duas do ESP32 compilam com o core esp32 3.3.11 para a placa `esp32:esp32:esp32doit-devkit-v1`.
 
 ## 8. Registro de bancada — 05/09/2026
 
@@ -443,6 +450,88 @@ resposta de erro, mas ninguém associou bipe a linha do log.
 Cadeia inteira provada: fiação, alimentação pelo `VIN`, UART nos dois sentidos, protocolo, RF e
 leitura de EPC. O que falta é firmware, não hardware.
 
+## 8e. Registro de bancada — 29/09/2026 (firmware da Fase 2, EPC real no aplicativo)
+
+Mesma montagem de 26/09: `5V` pelo `VIN`, USB do ESP32 no PC (COM3), antena de painel no
+`CON1`, micro-USB do R200 solto. O que mudou foi o firmware: `firmware.ino` com o novo
+`uhf_r200.cpp`, gravado pelo `arduino-cli` da IDE (84% da flash, 14% da RAM). A `ponte_uart`
+saiu da placa.
+
+**O boot configura o módulo sozinho**, em menos de 50 ms depois da primeira pergunta:
+
+```
+[BOOT] Inicializando R200...
+[UHF] Hardware: M100 26dBm V1.0
+[UHF] Firmware: V2.3.5
+[UHF] Fabricante: MagicRf
+[UHF] Regiao 902-928 MHz: ok
+[UHF] Potencia 18,00 dBm: ok
+[BOOT] R200 pronto
+[BOOT] Inicializando BLE...
+[BOOT] BLE iniciado. Aguardando conexões...
+```
+
+**Pela Serial USB, sem celular** (`SCAN_START`/`SCAN_STOP` digitados na porta):
+
+- Tags a ~50 cm: 25 s de inventário e nenhuma leitura. Também nenhum rearme — o firmware só
+  rearma depois de 3 s sem frame nenhum, então o módulo estava mandando frames o tempo todo; os
+  únicos que não vão ao log são os erros `0x15`, rodada sem tag no MagicRF. Leitura razoável,
+  não conferida byte a byte.
+- Uma tag encostada ao lado da antena e outra a 30 cm medidos: a próxima, `E20047066BF06027F7A20109`,
+  a −45 dBm, com cerca de 113 leituras a cada janela de 3 s (~37 por segundo) resumidas em um envio;
+  a de 30 cm, `E28068940000403592B56C31`, uma única vez, a −70 dBm.
+- Tag aproximada devagar a partir de longe: primeira leitura com ela a **~40 cm na horizontal e
+  ~25 cm acima da bancada** da antena (~47 cm em linha reta), a −71 dBm; depois, 51 leituras
+  em 3 s a −67 dBm. A 18 dBm, com esta antena e estas tags, a borda de leitura fica em torno de
+  −70 dBm e de meio metro.
+- `SCAN_STOP` respondido com `AA 01 28 00 01 00 2A DD`, o mesmo de 26/09.
+
+**Pelo aplicativo**, no celular, com a escuta passiva da COM3 aberta para acompanhar o log:
+
+```
+17,7 s  [BLE] Dispositivo conectado!
+32,2 s  [RX] Recebido: LED_ON              ← o app manda sozinho ao entrar no modo UHF
+38,7 s  [RX] Recebido: LED_ON              ← toque em "Escanear"
+42,8 s  [TAG] E28068940000403592B56C31  RSSI -66 dBm  (1 leituras)
+        [TX] Enviando mensagem longa (25 bytes)...   ← "EPC;" em 2 pacotes + __END__, 150 ms
+48,0 s  [TAG] E28068940000403592B56C31  RSSI -66 dBm  (26 leituras)
+```
+
+O aplicativo registrou `[ATIVO] E28068940000403592B56C31;` às 18:33:23, com o EPC como código
+do bem e a descrição vazia, e a segunda chegada como `[DUPLICADA] ... já conferido`: a
+deduplicação do lado do app funcionou com dado real. Tela em `docs/Foto 11 Teste de detecção de
+tag real no app com sucesso.jpeg`. O reenvio veio ~5 s depois, não 3 s: com a tag na borda do
+alcance a leitura é intermitente, e o firmware só reenvia na primeira leitura depois que a
+janela vence.
+
+`LED_ON`/`LED_OFF` continuam valendo como sinônimos de `SCAN_START`/`SCAN_STOP`; o aplicativo
+funcionou sem nenhuma mudança. O `VIN` segurou ESP32 com BLE ligado e R200 em inventário por
+cerca de dois minutos, sem `Brownout`.
+
+**Dois tropeços do aplicativo, não investigados:**
+
+- A primeira tentativa de "Conectar scanner" esgotou os 10 s de busca sem achar o
+  `RFID-POC-ESP32`, mesmo depois de reiniciar o ESP32 e com a Localização ligada. Passar para o
+  modo Manual e voltar ao UHF resolveu, e a conexão veio na hora — o firmware estava anunciando.
+- Nenhum `LED_OFF` chegou ao ESP32 durante a escuta; quem parou o inventário foi o `SCAN_STOP`
+  de segurança da escuta, aos 120 s. Não ficou registrado se o botão "Parar" foi tocado.
+
+**O buzzer apita a cada leitura.** Com a tag perto, são dezenas de bipes por segundo, sem
+parar, até o `SCAN_STOP` — num escritório com gente, o teste teve de ser interrompido puxando o
+USB. A janela de 3 s do firmware vale só para o BLE; o buzzer é da placa e o firmware não o
+controla. Não há comando serial conhecido para desligá-lo: o caminho documentado pela
+comunidade é dessoldar o resistor de 0 Ω `R9` (alimentação do buzzer) ou o `R11` (sinal do
+transistor que o aciona), segundo o repositório `playfultechnology/arduino-rfid-R200`. Sem solda
+nesta bancada, o buzzer fica, e teste com tag precisa ser curto e combinado com o ambiente.
+
+**Achados de bancada pelo Windows:** abrir a COM3 às vezes reinicia o ESP32, e um comando
+mandado nos primeiros ~2 s cai no boot e se perde — esperar o `BLE iniciado` antes de mandar
+qualquer coisa. Mexer em `DTR`/`RTS` pelo pyserial não reiniciou a placa e deixou a porta muda
+até ser reaberta com os valores padrão.
+
+Não conferido: o fim das 10000 rodadas do inventário contínuo e o rearme por silêncio da UART
+(nenhum teste durou o bastante), e o que exatamente o módulo manda a cada rodada sem tag.
+
 ## 9. Próximos passos
 
 **Pela bancada Debian (seção 2c) — não depende de solda:**
@@ -459,7 +548,9 @@ leitura de EPC. O que falta é firmware, não hardware.
 - [x] Gravar `diag_r200` e ler um ciclo: `RX2 em repouso = 1` fixo e `AA 01 03 ...` limpo a 115200 — a moldura é `AA`…`DD` (seções 4 e 8d)
 - [x] Velocidade confirmada em 115200; `teste_r200.py` passou para `AA`…`DD`
 - [x] Gravar `ponte_uart` e fazer o inventário pela porta do ESP32 — 3 tags lidas a 18 dBm (seção 8d)
-- [ ] Fase 2 — firmware do projeto lendo o R200 via UART2, saída BLE `EPC;` (RN-03), RSSI no log serial
+- [x] Fase 2 — firmware do projeto lendo o R200 via UART2, saída BLE `EPC;` (RN-03), RSSI no log serial — EPC real no aplicativo (seção 8e)
+- [ ] Ver o fim das 10000 rodadas do inventário contínuo e confirmar o rearme do firmware (3 s de UART em silêncio)
+- [ ] Aplicativo: investigar por que só conectou depois de passar pelo modo Manual, e se o `Parar` envia o `LED_OFF` (seção 8e)
 - [ ] Testar tags ABS anti-metal em superfície metálica real (datasheet não substitui teste físico)
 - [ ] Comparar alcance Higgs3 adesiva vs. ABS anti-metal, em papel e em metal
 - [ ] Levantar curva de potência × alcance (18 / 20 / 22 / 26 dBm) — pelo `teste_r200.py`, que dá o RSSI por leitura
