@@ -43,6 +43,9 @@ Veja o [roadmap no README](README.md#️-roadmap). Itens de curto prazo não dep
 1. **Abra uma issue primeiro** para mudanças não triviais. É um projeto pequeno e mantido por servidor público em tempo limitado — alinhar antes evita trabalho jogado fora.
 2. **Uma mudança por PR.** Facilita revisão e reversão.
 3. **Descreva como testou.** Especialmente em firmware: informe placa, versão da IDE e o que observou no Serial Monitor.
+4. **O CI precisa ficar verde.** Todo PR roda os testes unitários e o lint do app e compila os três sketches do firmware (`.github/workflows/android-ci.yml`). Para rodar o mesmo localmente: `./gradlew testDebugUnitTest lintDebug`.
+
+Falha de segurança não vai em issue nem em PR público: siga o [SECURITY.md](SECURITY.md).
 
 ## Padrões do projeto
 
