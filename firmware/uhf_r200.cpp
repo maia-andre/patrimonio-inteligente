@@ -23,7 +23,7 @@ static const uint8_t CMD_ERRO = 0xFF;
 static const uint8_t ERRO_SEM_TAG = 0x15;
 
 static const uint8_t REGIAO_US = 0x02;             // 902-928 MHz (secao 5 do HARDWARE_R200)
-static const uint16_t POTENCIA_CENTESIMOS = 1800;  // 18,00 dBm, a potencia de bancada
+static const uint16_t POTENCIA_CENTESIMOS = 2400;  // 24,00 dBm: primeiro degrau com alcance real (HARDWARE_R200, 8f)
 static const uint16_t RODADAS_INVENTARIO = 10000;  // a mesma do teste_r200.py
 
 // O inventario continuo termina depois das rodadas pedidas. Com ele ativo,
@@ -69,7 +69,7 @@ bool UhfR200::begin(HardwareSerial& porta, int pinoRx, int pinoTx) {
     const uint8_t regiao = REGIAO_US;
     const uint8_t potencia[] = {(uint8_t)(POTENCIA_CENTESIMOS >> 8), (uint8_t)(POTENCIA_CENTESIMOS & 0xFF)};
     bool ok = configurar(CMD_SET_REGIAO, &regiao, 1, "Regiao 902-928 MHz");
-    ok = configurar(CMD_SET_POTENCIA, potencia, sizeof(potencia), "Potencia 18,00 dBm") && ok;
+    ok = configurar(CMD_SET_POTENCIA, potencia, sizeof(potencia), "Potencia 24,00 dBm") && ok;
     return ok;
 }
 
