@@ -155,7 +155,7 @@ No modo código de barras são aceitos **Code 128, Code 39 e QR Code** — EAN e
 | Lançamento manual de código | ✅ **Funciona** | Campo de texto para o bem sem etiqueta legível; mesma lista e deduplicação |
 | Fluxo de leitura patrimonial | ✅ **Funciona na bancada** | Desde 29/09/2026 o ESP32 lê o R200 e envia o EPC real ao aplicativo, no formato `EPC;`. A simulação saiu do firmware |
 | Módulo leitor UHF na bancada | ✅ **Validado** | YPD-R200 recebido em 05/09/2026, pinos soldados em 21/09/2026. Em 26/09/2026 a cadeia inteira foi provada: alimentação pelo `VIN` do ESP32, UART a 115200 nos dois sentidos, protocolo e RF. O módulo usa a moldura `AA … DD`, não a `BB … 7E` da documentação do MagicRF — era isso que o fazia parecer mudo. Registro em [`docs/HARDWARE_R200.md`](docs/HARDWARE_R200.md) |
-| Leitura de tag RFID UHF real | ✅ **Ponta a ponta, na bancada** | Em 29/09/2026 uma tag real foi lida pelo firmware do projeto e conferida no aplicativo ([foto](docs/Foto%2011%20Teste%20de%20detec%C3%A7%C3%A3o%20de%20tag%20real%20no%20app%20com%20sucesso.jpeg)). A 18 dBm, a leitura começa a cerca de meio metro. Falta caracterizar alcance, ângulo e material; o buzzer da placa apita a cada leitura e só sai com solda |
+| Leitura de tag RFID UHF real | ✅ **Ponta a ponta, na bancada** | Em 29/09/2026 uma tag real foi lida pelo firmware do projeto e conferida no aplicativo ([foto](docs/Foto%2011%20Teste%20de%20detec%C3%A7%C3%A3o%20de%20tag%20real%20no%20app%20com%20sucesso.jpeg)). Em 24/10/2026, no escritório, a 24 dBm e com a antena apontada, quatro tags até ~1 m chegaram ao aplicativo ([foto](docs/Foto%2012%20App%20UHF%204%20tags%20lidas%20a%2024%20dBm.jpg)) — a orientação da antena pesou mais que a potência. Falta caracterizar metal e líquido; o buzzer da placa apita a cada leitura e só sai com solda |
 | Persistência local (histórico) | ❌ **Não existe** | Planejado com Room |
 | Integração com sistema de patrimônio | ❌ **Não existe** | Depende de API do sistema municipal |
 | Camada de IA (reconciliação, anomalias) | ❌ **Não existe** | Especificada em [Onde entra a IA](#-onde-entra-a-inteligência-artificial) |
@@ -241,7 +241,7 @@ A lista de materiais abaixo vale **só para o modo RFID UHF**. Para conhecer o f
 
 **Especificações do YPD-R200:** chip Impinj E710 · protocolo EPCglobal UHF Class 1 Gen 2 / ISO 18000-6C · região configurável, usamos 902–928 MHz (US), que cobre as faixas liberadas pela ANATEL · alcance 0–6 m conforme antena, tag e ambiente · alimentação 5 V · potência RF ajustável 15–26 dBm · UART em 3,3 V a 115200, protocolo de frames MagicRF — nesta unidade com moldura `AA ... DD`, não `BB ... 7E`; o módulo se identifica como `M100 26dBm V1.0`, fabricante `MagicRf` · micro-USB com conversor CH340 embutido. Montagem, pinagem, protocolo e diagnóstico estão em [`docs/HARDWARE_R200.md`](docs/HARDWARE_R200.md).
 
-> ⚠️ **Alimentação:** o R200 puxa picos acima de 500 mA na transmissão. **Nunca pelo pino 3.3V do ESP32.** Na bancada, o pino `VIN` do ESP32 (5 V da USB, porta do PC) sustentou o módulo nos comandos e em 15 s de inventário contínuo a 18 dBm; para potência maior e uso prolongado, fonte externa de 5 V com GND compartilhado. E **antena conectada antes de energizar**, sempre: transmitir sem carga pode queimar o amplificador.
+> ⚠️ **Alimentação:** o R200 puxa picos acima de 500 mA na transmissão. **Nunca pelo pino 3.3V do ESP32.** Na bancada, o pino `VIN` do ESP32 (5 V da USB, porta do PC) sustentou o módulo a 24 dBm com o BLE ligado (a potência configurada pelo firmware) e, sem BLE, até 26 dBm em rodadas de 10 s; para 26 dBm e uso prolongado, fonte externa de 5 V com GND compartilhado. E **antena conectada antes de energizar**, sempre: transmitir sem carga pode queimar o amplificador.
 
 > ⚠️ **Pinos:** a placa do R200 vem sem pinos. **Solde-os.** Pino apenas encaixado no furo alimenta a placa, mas não sustenta a UART — aprendemos isso em uma tarde inteira de bancada. E o micro-USB da própria placa **não é atalho**: gastamos um segundo dia provando que o CH340 dela não entrega os dados do módulo ao PC, em velocidade nenhuma. Os dois becos sem saída estão documentados, com os sintomas, para você não repetir nenhum dos dois.
 
@@ -261,7 +261,7 @@ Ferramentas de bancada do módulo UHF, à parte do firmware: `firmware/teste_r20
 [BOOT] Inicializando R200...
 [UHF] Hardware: M100 26dBm V1.0
 [UHF] Regiao 902-928 MHz: ok
-[UHF] Potencia 18,00 dBm: ok
+[UHF] Potencia 24,00 dBm: ok
 [BOOT] BLE iniciado. Aguardando conexões...
 [BLE] Dispositivo conectado!
 [RX] Recebido: LED_ON
@@ -352,7 +352,7 @@ graph LR
     style F1 fill:#fef3c7,stroke:#b45309,stroke-width:3px
 ```
 
-**📍 Estamos aqui:** validando — a leitura real funciona ponta a ponta na bancada (tag → R200 → ESP32 → BLE → aplicativo); a etapa agora é caracterizar alcance e materiais.
+**📍 Estamos aqui:** validando — a leitura real funciona ponta a ponta na bancada (tag → R200 → ESP32 → BLE → aplicativo); o alcance em ambiente real foi medido (~1 m a 24 dBm, 24/10/2026); falta caracterizar metal e líquido.
 
 <details>
 <summary><b>Detalhamento das tarefas por horizonte</b></summary>
@@ -373,7 +373,8 @@ graph LR
 - [x] Ler a primeira tag pelo `teste_r200.py` através da ponte serial (26/09/2026)
 - [x] Implementar os comandos de inventário do módulo no firmware (`uhf_r200.cpp`) (29/09/2026)
 - [x] Substituir a mensagem simulada pelo EPC real lido da tag, no formato `EPC;` — conferido no aplicativo (29/09/2026)
-- [ ] Caracterizar leitura a diferentes distâncias, ângulos e materiais (metal e líquido degradam UHF); comparar Higgs3 adesiva e ABS anti-metal
+- [x] Curva de potência × alcance, no escritório: ~1 m a 24 dBm com a antena apontada; firmware passa a 24 dBm (24/10/2026)
+- [ ] Caracterizar leitura em metal e líquido (degradam UHF); comparar Higgs3 adesiva e ABS anti-metal
 
 **Longo prazo — produção**
 - [ ] Avaliar módulo industrial (JRD4035 ou superior) para anti-colisão em massa

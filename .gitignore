@@ -26,3 +26,7 @@ local.properties
 # Python (script de bancada do R200)
 __pycache__/
 *.pyc
+
+# Videos de bancada: grandes demais para o git (o GitHub recusa acima de 100 MB).
+# Ficam so na maquina; trechos curtos vao para a vitrine.
+/docs/*.mp4

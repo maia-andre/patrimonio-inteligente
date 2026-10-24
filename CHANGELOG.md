@@ -1,5 +1,18 @@
 # Changelog
 
+## Potência × alcance no escritório, firmware a 24 dBm (24/10/2026)
+Escadinha de 18 a 26 dBm no ambiente real — escritório, seis PCs, mesas em L — com seis tags em linha de 10 a 160 cm e uma anti-metal sobre um cortador de papel. Registro em `docs/HARDWARE_R200.md`, seção 8f; dados de todas as rodadas em `docs/medicoes_r200_2026-10-24.csv`.
+
+- **A geometria pesou mais que a potência.** A 24 dBm, a antena deitada com a face para cima lia ~40 cm; em pé, apontada para as tags e girada 90° sobre o próprio eixo, ~1 m. A antena irradia para a frente da face, e tag deitada na mesa só é bem vista numa das duas orientações.
+- **Com a antena presa:** de 18 a 22 dBm, só a tag de 10 cm; a 24 dBm aparece a de ~100 cm; a 26, três tags distantes, todas na borda (~1 leitura/s) e com muito mais rodadas vazias. A tag de 40 cm caiu num ponto cego por reflexão.
+- **Em aberto:** o RSSI da tag mais próxima quase não sobe com a potência. Saturação ou amplificador sem corrente pelo `VIN` — só uma fonte 5 V externa responde.
+- **`firmware/uhf_r200.cpp` configura 24 dBm no boot** (era 18). Conferido pelo aplicativo: ~61 s de inventário com o BLE ligado, sem reinício; quatro tags na lista (`docs/Foto 12` a `14`).
+- **O "Parar" do aplicativo chega ao ESP32** como `LED_OFF` — o tropeço de 29/09 não se repetiu, nem o da conexão.
+- **`teste_r200.py --medir DBM [SEGUNDOS] [RÓTULO]`**: inventário por tempo fixo numa potência, parado sozinho no fim, com resumo por tag e o resultado acrescentado a um CSV.
+- `HARDWARE_R200.md`: na seção 6, antena mal apontada e ponto cego por reflexão; na seção 9, o caminho pelo micro-USB do R200 marcado como abandonado.
+- Vídeos das rodadas ficam fora do git (`/docs/*.mp4` no `.gitignore`); prints do aplicativo nos três modos em `docs/Foto 12` a `16`.
+- README e SECURITY.md passam de 18 para 24 dBm.
+
 ## CI, dependabot e política de segurança (08/10/2026)
 Primeiro pull request externo do projeto (#1, de Marcos Méndez), com ajustes da revisão.
 

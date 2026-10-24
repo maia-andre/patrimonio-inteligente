@@ -30,7 +30,7 @@ implantação real numa prefeitura ou órgão:
 
 ## O que este repositório **é** e o que **não é** hoje
 
-**É:** prova de conceito com hardware validado (R200 lendo tags a 18 dBm) e
+**É:** prova de conceito com hardware validado (R200 lendo tags a 24 dBm) e
 app Android com clean architecture e testes unitários (`app/src/test/`). O
 protocolo BLE está documentado e não tem autenticação nem cifra (ver
 Superfície BLE acima).

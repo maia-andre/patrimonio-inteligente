@@ -189,7 +189,7 @@ UART2 a 115200 8N1.
 Por ordem de preferência:
 
 1. **Fonte externa 5 V no furo `5V`**: carregador de celular ou power bank com cabo USB cortado (vermelho = 5 V, preto = GND). É o que aguenta os picos de transmissão. O GND dessa fonte precisa estar no GND do ESP32, o que o fio `J3 GND` já garante.
-2. **`VIN` do ESP32 no furo `5V`**: os 5 V da USB do PC passam pelo ESP32 e alimentam o R200. Uma porta USB 3 dá até 900 mA; a ponte serial não liga o rádio do ESP32, então a maior parte sobra para o R200. Em 24/10/2026, pela ponte, aguentou de 18 a 26 dBm sem reinício (seção 8f) — com BLE ligado, a carga do firmware do projeto, só foi conferido a 18 dBm. Se o módulo reiniciar no meio do inventário, é falta de corrente: voltar à opção 1.
+2. **`VIN` do ESP32 no furo `5V`**: os 5 V da USB do PC passam pelo ESP32 e alimentam o R200. Uma porta USB 3 dá até 900 mA; a ponte serial não liga o rádio do ESP32, então a maior parte sobra para o R200. Em 24/10/2026 aguentou de 18 a 26 dBm pela ponte, e 24 dBm com o firmware do projeto e o BLE ligado, sem reinício (seção 8f); 26 dBm com BLE não foi testado. Se o módulo reiniciar no meio do inventário, é falta de corrente: voltar à opção 1.
 3. **Micro-USB do R200 em carregador ou power bank, nunca em computador**: alimenta pelo conector, sem pino de força. Como o CH340 acorda junto e segura a linha `RXD` em repouso, só é aceitável se `R14`/`R15` forem mesmo resistores em série. Último recurso.
 
 ### O que o firmware da Fase 2 precisa entregar
@@ -595,6 +595,37 @@ primeiro degrau que ganha alcance e ainda é estável. 26 dBm fica para quando h
 externa, para saber se a instabilidade era falta de corrente. Falta conferir 24 dBm com o BLE
 ligado, que é a carga real no `VIN`.
 
+**Conferido no mesmo dia, pelo aplicativo.** Firmware do projeto regravado; boot com
+`[UHF] Potencia 24,00 dBm: ok`. Escuta passiva da COM3 aberta durante a sessão:
+
+```
+15:21:01  [RX] Recebido: LED_ON                ← "Escanear" no app
+15:21:01  [UHF] Inventario iniciado
+15:21:01  [TAG] E28068940000403592B56C31  RSSI -50 dBm  (1 leituras)
+15:21:02  [TAG] E2004713AA3068213EEE0111  RSSI -69 dBm  (1 leituras)
+15:21:16  [TAG] E28069150000402D9DF10563  RSSI -63 dBm  (1 leituras)
+15:21:18  [TAG] E2004713A77068213EC2010E  RSSI -64 dBm  (1 leituras)
+   ...
+15:22:02  [RX] Recebido: LED_OFF               ← "Parar" no app
+15:22:02  [UHF] Inventario parado
+15:22:02  [UHF] frame: AA 01 28 00 01 00 2A DD
+```
+
+- **~61 s a 24 dBm com o BLE ligado**, sem reinício e sem `Brownout`: o `VIN` da USB aguenta a
+  carga real nessa potência.
+- **4 tags no aplicativo** (10, 40, 70 e 100 cm), 59 envios pelo BLE, todos concluídos; a
+  deduplicação marcou as chegadas seguintes como "já conferido". Telas em `docs/Foto 12` a
+  `Foto 14`. A antena caiu no meio da sessão, então os RSSI dela não entram na comparação de
+  alcance — vale como prova de funcionamento, não como medida.
+- **O "Parar" envia `LED_OFF`** e o inventário para: o tropeço de 29/09 não se repetiu.
+- **A conexão foi direto pelo modo UHF**, sem passar pelo Manual. Uma vez só não basta para dar
+  o tropeço de 29/09 por resolvido.
+- No mesmo minuto, os modos NFC e código de barras também conferiram itens na mesma sessão
+  (`Foto 15` e `Foto 16`, esta lendo a plaqueta patrimonial de um monitor).
+
+Vídeos das rodadas da escadinha (`docs/Vídeo 01` a `Vídeo 12`, com potência e montagem no nome)
+ficam fora do git pelo tamanho.
+
 Fora da escadinha, a primeira rodada do dia, com três tags na mão a ~50 cm e a mão se
 aproximando, leu uma tag que não apareceu em nenhuma outra (`…408D45`); não entra na
 comparação.
@@ -614,10 +645,11 @@ soldado, pelo ESP32.
 - [x] Gravar `ponte_uart` e fazer o inventário pela porta do ESP32 — 3 tags lidas a 18 dBm (seção 8d)
 - [x] Fase 2 — firmware do projeto lendo o R200 via UART2, saída BLE `EPC;` (RN-03), RSSI no log serial — EPC real no aplicativo (seção 8e)
 - [ ] Ver o fim das 10000 rodadas do inventário contínuo e confirmar o rearme do firmware (3 s de UART em silêncio)
-- [ ] Aplicativo: investigar por que só conectou depois de passar pelo modo Manual, e se o `Parar` envia o `LED_OFF` (seção 8e)
+- [x] Aplicativo: o `Parar` envia o `LED_OFF` (conferido em 24/10/2026, seção 8f)
+- [ ] Aplicativo: conexão só depois de passar pelo modo Manual (29/09) — não se repetiu em 24/10; observar mais vezes
 - [ ] Testar tags ABS anti-metal em superfície metálica real (datasheet não substitui teste físico)
 - [ ] Comparar alcance Higgs3 adesiva vs. ABS anti-metal, em papel e em metal
 - [x] Levantar curva de potência × alcance (18 a 26 dBm) — `teste_r200.py --medir`; alcance abre a 24 dBm, ~1 m com a antena bem orientada (seção 8f)
-- [ ] Conferir 24 dBm no firmware do projeto com o BLE ligado e o aplicativo conectado
+- [x] Conferir 24 dBm no firmware do projeto com o BLE ligado e o aplicativo conectado — ~61 s, 4 tags, sem reinício (seção 8f)
 - [ ] Repetir 24 e 26 dBm com fonte 5 V externa: o RSSI que não sobe é saturação ou amplificador sem corrente? (seção 8f)
 - [ ] Confirmar com a Proxion: homologação ANATEL por escrito, faixa de frequência, acesso ao SDK Zebra
