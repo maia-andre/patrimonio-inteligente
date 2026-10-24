@@ -17,6 +17,7 @@ Uso:
     python teste_r200.py /dev/ttyUSB0 --cego         # nada volta: ouvir o buzzer
     python teste_r200.py /dev/ttyUSB0 --eco          # loopback no J3
     python teste_r200.py /dev/ttyUSB0 --cru [baud]   # monitor cru, sem filtro nenhum
+    python teste_r200.py COM3 --medir 20 15 "50cm higgs3"  # potencia x alcance
     python teste_r200.py /dev/ttyUSB0    # Linux
 
 ATENCAO: conecte a antena ANTES de energizar o modulo.
@@ -648,6 +649,105 @@ def monitor_cru(porta: str, baud: int):
         print("  se eles disseram (sem resposta), o filtro esta neles.")
 
 
+# ---------------------------------------------------------------- medicao
+POTENCIA_MIN, POTENCIA_MAX = 15, 26  # dBm, faixa do "M100 26dBm"
+CSV_MEDICOES = "medicoes_r200.csv"
+
+
+def medir(porta: str, dbm: float, segundos: float, rotulo: str):
+    """Inventario por tempo fixo numa potencia, com resumo por tag.
+
+    Para a escadinha de potencia x alcance: mesma montagem, so a potencia e
+    a posicao da tag mudam. O inventario e parado no finally, para o modulo
+    nao ficar transmitindo (e apitando) se o script morrer. Cada medicao e
+    acrescentada a medicoes_r200.csv no diretorio corrente.
+    """
+    if not POTENCIA_MIN <= dbm <= POTENCIA_MAX:
+        sys.exit(f"Potencia fora da faixa do modulo: {dbm} (de {POTENCIA_MIN} a {POTENCIA_MAX} dBm)")
+    centesimos = round(dbm * 100)
+
+    print(f"Medicao: {dbm:.2f} dBm por {segundos:g} s em {porta}" + (f"  [{rotulo}]" if rotulo else ""))
+    with abrir_porta(porta, BAUD_PADRAO) as ser:
+        ser.write(CMD_PARAR)  # sessao anterior pode ter morrido no meio de um inventario
+        ler_ate_silencio(ser, silencio=0.3, limite=1.0)
+
+        enviar(ser, CMD_SET_REGIAO(REGIOES["us"]), "Regiao 902-928 MHz")
+        resposta = enviar(ser, CMD_SET_POTENCIA(centesimos), f"Potencia = {dbm:.2f} dBm")
+        aceita = bytes([0x01, 0xB6, 0x00, 0x01, 0x00]) in resposta
+        if not aceita:
+            print("  [aviso] o modulo nao confirmou a potencia; a medicao segue, mas confira o RX acima")
+
+        buffer = bytearray()
+        rssis = {}
+        sem_tag = erros = 0
+        maior_silencio = 0.0
+        print(f"\n  inventario por {segundos:g} s...")
+        ser.write(CMD_INVENTARIO_MULTI(10000))
+        t0 = ultimo_frame = time.time()
+        try:
+            while time.time() - t0 < segundos:
+                dados = ser.read(ser.in_waiting or 1)
+                if not dados:
+                    continue
+                buffer.extend(dados)
+                for frame in extrair_frames(buffer):
+                    agora = time.time()
+                    maior_silencio = max(maior_silencio, agora - ultimo_frame)
+                    ultimo_frame = agora
+                    if frame[2] == 0x22 and frame[1] == 0x02:
+                        resultado = interpretar_tag(frame)
+                        if resultado:
+                            epc, rssi = resultado
+                            if epc not in rssis:
+                                print(f"  [{agora - t0:5.1f}s] NOVA {epc}  RSSI {rssi} dBm")
+                            rssis.setdefault(epc, []).append(rssi)
+                    elif frame[2] == 0xFF:
+                        if len(frame) > 5 and frame[5] == 0x15:
+                            sem_tag += 1
+                        else:
+                            erros += 1
+        finally:
+            ser.write(CMD_PARAR)
+            time.sleep(0.2)
+        maior_silencio = max(maior_silencio, time.time() - ultimo_frame)
+
+    print("\n" + "=" * 72)
+    print(f"{dbm:.2f} dBm, {segundos:g} s" + (f", {rotulo}" if rotulo else "")
+          + f" -- potencia {'aceita' if aceita else 'NAO confirmada'}")
+    if not rssis:
+        print("  nenhuma tag lida")
+    for epc, valores in sorted(rssis.items(), key=lambda par: -len(par[1])):
+        media = sum(valores) / len(valores)
+        print(f"  {epc}  {len(valores):5d} leituras  {len(valores) / segundos:5.1f}/s"
+              f"  RSSI min {min(valores)}  med {media:.0f}  max {max(valores)} dBm")
+    print(f"  rodadas sem tag: {sem_tag}   outros erros: {erros}"
+          f"   maior silencio da UART: {maior_silencio:.1f} s")
+    if maior_silencio >= 2.0:
+        print("  [aviso] silencio longo: o modulo pode ter reiniciado (bipe de boot?) -- falta de corrente")
+    print("=" * 72)
+
+    novo = False
+    try:
+        with open(CSV_MEDICOES, "x", encoding="utf-8") as arq:
+            arq.write("data_hora;rotulo;dbm;segundos;potencia_aceita;epc;leituras;por_s;"
+                      "rssi_min;rssi_med;rssi_max;maior_silencio_s\n")
+            novo = True
+    except FileExistsError:
+        pass
+    carimbo = time.strftime("%Y-%m-%d %H:%M:%S")
+    with open(CSV_MEDICOES, "a", encoding="utf-8") as arq:
+        linhas = rssis.items() or [("", [])]
+        for epc, valores in linhas:
+            n = len(valores)
+            arq.write(";".join(str(campo) for campo in (
+                carimbo, rotulo, f"{dbm:.2f}", f"{segundos:g}", int(aceita), epc, n,
+                f"{n / segundos:.1f}",
+                min(valores) if n else "", f"{sum(valores) / n:.0f}" if n else "", max(valores) if n else "",
+                f"{maior_silencio:.1f}",
+            )) + "\n")
+    print(f"  {'criado' if novo else 'acrescentado a'} {CSV_MEDICOES}")
+
+
 # ---------------------------------------------------------------- principal
 def main():
     if len(sys.argv) < 2:
@@ -670,6 +770,15 @@ def main():
 
     if len(sys.argv) > 2 and sys.argv[2] in ("--eco", "-e"):
         teste_eco(porta)
+        return
+
+    if len(sys.argv) > 2 and sys.argv[2] in ("--medir", "-m"):
+        try:
+            dbm = float(sys.argv[3].replace(",", "."))
+            segundos = float(sys.argv[4]) if len(sys.argv) > 4 else 15
+        except (IndexError, ValueError):
+            sys.exit("Uso: teste_r200.py PORTA --medir DBM [SEGUNDOS] [ROTULO]")
+        medir(porta, dbm, segundos, " ".join(sys.argv[5:]))
         return
 
     if len(sys.argv) > 2 and sys.argv[2] in ("--cru", "-r"):
