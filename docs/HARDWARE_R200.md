@@ -189,7 +189,7 @@ UART2 a 115200 8N1.
 Por ordem de preferência:
 
 1. **Fonte externa 5 V no furo `5V`**: carregador de celular ou power bank com cabo USB cortado (vermelho = 5 V, preto = GND). É o que aguenta os picos de transmissão. O GND dessa fonte precisa estar no GND do ESP32, o que o fio `J3 GND` já garante.
-2. **`VIN` do ESP32 no furo `5V`**: os 5 V da USB do PC passam pelo ESP32 e alimentam o R200. Uma porta USB 3 dá até 900 mA; a ponte serial não liga o rádio do ESP32, então a maior parte sobra para o R200. Em 18 dBm tende a funcionar. Se o módulo reiniciar no meio do inventário, é falta de corrente: voltar à opção 1.
+2. **`VIN` do ESP32 no furo `5V`**: os 5 V da USB do PC passam pelo ESP32 e alimentam o R200. Uma porta USB 3 dá até 900 mA; a ponte serial não liga o rádio do ESP32, então a maior parte sobra para o R200. Em 24/10/2026, pela ponte, aguentou de 18 a 26 dBm sem reinício (seção 8f) — com BLE ligado, a carga do firmware do projeto, só foi conferido a 18 dBm. Se o módulo reiniciar no meio do inventário, é falta de corrente: voltar à opção 1.
 3. **Micro-USB do R200 em carregador ou power bank, nunca em computador**: alimenta pelo conector, sem pino de força. Como o CH340 acorda junto e segura a linha `RXD` em repouso, só é aceitável se `R14`/`R15` forem mesmo resistores em série. Último recurso.
 
 ### O que o firmware da Fase 2 precisa entregar
@@ -294,6 +294,8 @@ Para bancada com potência baixa é o caminho normal. **Para o sistema em produ�
 | Porta abre mas `RX: (sem resposta)` | Moldura errada: este módulo só aceita `AA`…`DD` (seção 4) e ignora `BB`…`7E` sem responder; baud errado (deve ser 115200); ou cabo USB só de carga, sem linhas de dados. Testar outro cabo. |
 | `[aviso] checksum inválido` | Ruído na linha, cabo longo demais, ou disputa de UART (USB + ESP32 ao mesmo tempo). Um aviso isolado no meio de leituras boas é normal: o parser se ressincroniza sozinho. |
 | Responde a comandos mas não lê tag | Antena mal rosqueada; potência baixa demais; tag encostada em metal sem ser anti-metal; distância. Começar com a tag a 5–10 cm. |
+| Só lê as tags mais próximas, e subir a potência quase não muda nada | Antena mal apontada: ela irradia para a frente da face, e deitada na mesa ilumina o teto. Pôr a face em pé, virada para as tags, e testar as duas orientações girando 90° sobre o próprio eixo — tag deitada na mesa só é bem vista numa delas. Em 24/10/2026 isso levou o alcance de ~40 cm a ~100 cm na mesma potência (seção 8f). |
+| Tag próxima não lida enquanto uma mais distante é | Ponto cego por reflexão: em ambiente fechado o sinal volta de mesas, PCs e paredes e, em certos pontos, os reflexos se anulam. Mover a tag ou o leitor alguns centímetros. Visto em 24/10/2026 com a tag de 40 cm. |
 | Módulo reinicia durante o inventário | Alimentação insuficiente — pico de TX. Fonte externa, contato firme no VCC/GND. |
 | `diag_r200`: `RX2 em repouso` alterna entre `0` e `1` de uma linha para outra | Contato do `TXD` indo e vindo. Pino sem solda. |
 | `diag_r200`: respostas só com bytes como `00 00 00 80 C0 E0 F0 FC FE`, em todas as velocidades | Não é velocidade errada: é linha que fica em baixo e sobe devagar, assinatura de contato resistivo. Pino sem solda. Velocidade errada dá lixo diferente, e em uma das velocidades o frame sai limpo. |
@@ -309,7 +311,7 @@ Para bancada com potência baixa é o caminho normal. **Para o sistema em produ�
 
 | Ferramenta | Roda em | Para quê |
 |---|---|---|
-| `teste_r200.py` | PC, Python 3 + pyserial | Versão, região, potência, inventário único e contínuo com lista de EPCs. Com `--varrer`, descobre a velocidade da UART antes de tudo; com um número como segundo argumento, força a velocidade. Funciona pelo micro-USB do R200 (nativo no Linux, driver CH340 no Windows) ou pela porta do ESP32 com a ponte gravada. |
+| `teste_r200.py` | PC, Python 3 + pyserial | Versão, região, potência, inventário único e contínuo com lista de EPCs. Com `--varrer`, descobre a velocidade da UART antes de tudo; com um número como segundo argumento, força a velocidade. Com `--medir DBM [SEGUNDOS] [RÓTULO]`, roda o inventário por tempo fixo numa potência, para o módulo sozinho no fim, resume cada tag (leituras, leituras/s, RSSI mín/méd/máx), avisa silêncio longo da UART (possível reinício) e acrescenta o resultado a `medicoes_r200.csv` no diretório corrente. Funciona pelo micro-USB do R200 (nativo no Linux, driver CH340 no Windows) ou pela porta do ESP32 com a ponte gravada. |
 | `ponte_uart/ponte_uart.ino` | ESP32 | Repassa bytes USB ↔ UART2 sem interpretar. Faz o ESP32 de conversor USB-serial para o R200 quando o Windows não tem driver do CH340. |
 | `diag_r200/diag_r200.ino` | ESP32 | Sem PC no meio: manda a versão de hardware em cada velocidade de 9600 a 230400, em ciclo, e imprime no monitor serial o nível de repouso do `RX2` (pull-up interno desligado, então `1` é prova real) e os bytes que voltam. Na pausa de 2,5 s entre envios grava as transições do `RX2` e imprime as durações em µs, o que permite decodificar no PC, em qualquer velocidade, algo que o módulo mande fora de hora. Para mexer nos fios com o monitor aberto e para descobrir a velocidade e a moldura do módulo. |
 
@@ -532,14 +534,76 @@ até ser reaberta com os valores padrão.
 Não conferido: o fim das 10000 rodadas do inventário contínuo e o rearme por silêncio da UART
 (nenhum teste durou o bastante), e o que exatamente o módulo manda a cada rodada sem tag.
 
+## 8f. Registro de bancada — 24/10/2026 (potência × alcance, no escritório)
+
+Mesma montagem de 29/09 (`5V` pelo `VIN`, USB do ESP32 no PC, COM3), com a `ponte_uart`
+gravada para o `teste_r200.py --medir` falar direto com o módulo — sem BLE durante as
+medições. Rodadas de 10 s; dados de todas em `docs/medicoes_r200_2026-10-24.csv`.
+
+**Ambiente real:** escritório, o PC da bancada e mais cinco nas imediações, mesas em L. Nada
+foi tirado do lugar. Seis tags adesivas em linha numa mesa, a 10, 40, 70, 100, 130 e 160 cm da
+face da antena, e uma ABS anti-metal a ~190 cm em cima de um cortador de papel (metal).
+Tags misturadas com as de 26/09, sem identificação de qual EPC está em qual posição: a
+atribuição abaixo é por coerência de RSSI entre rodadas, não conferida.
+
+**O que mais pesou no alcance foi a geometria, não a potência.** Todas a 24 dBm:
+
+| Montagem | Tags lidas | Alcance |
+|---|---|---|
+| Antena deitada, face para cima; tags em ziguezague seguindo o L das mesas | 2 | ~40 cm |
+| Antena em pé, face para as tags; tags em ziguezague no L | 2 | ~40 cm |
+| Antena em pé; tags em linha reta | 3 | ~70 cm |
+| Antena na mão, mesma orientação | 3 | ~70 cm |
+| Antena na mão, girada 90° sobre o próprio eixo (orientação B) | 4 | ~100 cm |
+
+A antena irradia para a frente da face; deitada, ilumina o teto, e as tags próximas eram lidas
+só pela borda do feixe — de 18 a 24 dBm nessa posição, o RSSI das duas tags lidas mal mudou e
+nenhuma terceira apareceu. Com a antena apontada, a orientação ainda conta: com as tags
+deitadas na mesa, a orientação B leu uma tag a mais. Segurar pelas costas, onde fica o plano de
+terra, afetou pouco (orientação A na mão ≈ apoiada).
+
+**Escadinha com a antena presa (orientação B, apoiada num calendário)**, sem tocar em nada
+entre as rodadas:
+
+| Potência | 10 cm `…B56C31` | Outras tags | Rodadas sem tag |
+|---|---|---|---|
+| 18 dBm | −55 dBm, 38/s | — | 3 |
+| 20 dBm | −54 dBm, 38/s | — | 4 |
+| 22 dBm | −53 dBm, 37/s | — | 5 |
+| 24 dBm | −53 dBm, 35/s | `…EEE0111` (provavelmente 100 cm) −67 dBm, 0,7/s | 5 |
+| 26 dBm | −54 dBm, 28/s | `…EEE0111` −72, `…F7A20109` −70, `…C2010E` −72 dBm, 0,2 a 1,4/s | 41 |
+
+- O alcance só abre a partir de 24 dBm. A 26 aparecem três tags distantes, todas na borda
+  (−67 a −74 dBm, cerca de uma leitura por segundo ou menos) — pouco para inventário.
+- **A tag de 40 cm (`…F10563`) sumiu** com a antena presa, em todas as potências, depois de ser
+  lida em todas as montagens anteriores: ponto cego por reflexão (seção 6). Com leitor na mão
+  em uso real, a varredura passa por esses pontos.
+- **O RSSI da tag de 10 cm quase não subiu**: de −55 para −53/−54 dBm, onde 8 dB a mais de
+  potência deveriam dar perto de +8. Ou a leitura satura tão perto da antena, ou o amplificador
+  não entrega a potência configurada com o `VIN` da USB. As 41 rodadas sem tag e uma leitura a
+  −86 dBm nessa mesma tag a 26 dBm combinam com a segunda; só uma fonte 5 V externa separa as
+  duas. Em aberto.
+- O módulo confirmou cada potência (`AA 01 B6 00 01 00 B8 DD`), e a leitura de volta pelo
+  comando `0xB7` deu `07 D0` a 20 dBm — o ajuste é real. Nenhum reinício em toda a sessão (maior
+  silêncio da UART: 0,3 s), módulo frio ao toque depois de ~2,5 min acumulados de transmissão
+  entre 18 e 26 dBm.
+- A anti-metal sobre o cortador e as tags de 130 e 160 cm nunca foram lidas com atribuição
+  segura; a `…F7A20109`, que só apareceu a 26 dBm, pode ser a de 130 cm.
+
+**Decisão:** o firmware do projeto passa a configurar **24 dBm** no boot (`uhf_r200.cpp`) — o
+primeiro degrau que ganha alcance e ainda é estável. 26 dBm fica para quando houver fonte 5 V
+externa, para saber se a instabilidade era falta de corrente. Falta conferir 24 dBm com o BLE
+ligado, que é a carga real no `VIN`.
+
+Fora da escadinha, a primeira rodada do dia, com três tags na mão a ~50 cm e a mão se
+aproximando, leu uma tag que não apareceu em nenhuma outra (`…408D45`); não entra na
+comparação.
+
 ## 9. Próximos passos
 
-**Pela bancada Debian (seção 2c) — não depende de solda:**
-
-- [ ] Preparar o notebook: `python3-serial`, clone raso, grupo `dialout`
-- [ ] Plugar o micro-USB do R200 e confirmar `ttyUSB0` no `dmesg` (se sumir, remover o `brltty`)
-- [ ] `teste_r200.py /dev/ttyUSB0 --varrer`: achar a velocidade da UART e anotar na seção 4
-- [ ] `teste_r200.py /dev/ttyUSB0 <baud>`: versão, região, potência, inventário com uma tag Higgs3 a 5–10 cm
+**Pela bancada Debian, micro-USB do R200 (seção 2c) — abandonado:** em 19/09/2026 o CH340 da
+placa não entregou ao PC nada do que o módulo fala (seção 8b). O caminho que ficou é o `J3`
+soldado, pelo ESP32.
 
 **Pelo ESP32 — depende de solda, e é o que leva ao aplicativo:**
 
@@ -553,5 +617,7 @@ Não conferido: o fim das 10000 rodadas do inventário contínuo e o rearme por 
 - [ ] Aplicativo: investigar por que só conectou depois de passar pelo modo Manual, e se o `Parar` envia o `LED_OFF` (seção 8e)
 - [ ] Testar tags ABS anti-metal em superfície metálica real (datasheet não substitui teste físico)
 - [ ] Comparar alcance Higgs3 adesiva vs. ABS anti-metal, em papel e em metal
-- [ ] Levantar curva de potência × alcance (18 / 20 / 22 / 26 dBm) — pelo `teste_r200.py`, que dá o RSSI por leitura
+- [x] Levantar curva de potência × alcance (18 a 26 dBm) — `teste_r200.py --medir`; alcance abre a 24 dBm, ~1 m com a antena bem orientada (seção 8f)
+- [ ] Conferir 24 dBm no firmware do projeto com o BLE ligado e o aplicativo conectado
+- [ ] Repetir 24 e 26 dBm com fonte 5 V externa: o RSSI que não sobe é saturação ou amplificador sem corrente? (seção 8f)
 - [ ] Confirmar com a Proxion: homologação ANATEL por escrito, faixa de frequência, acesso ao SDK Zebra

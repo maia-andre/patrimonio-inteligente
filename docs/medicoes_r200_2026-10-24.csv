@@ -1,0 +1,34 @@
+data_hora;rotulo;dbm;segundos;potencia_aceita;epc;leituras;por_s;rssi_min;rssi_med;rssi_max;maior_silencio_s
+2026-10-24 14:34:20;50cm;18.00;10;1;E2000020240F016305408D45;72;7.2;-68;-66;-64;0.2
+2026-10-24 14:40:11;balcao zigue-zague 10cm+30cm;18.00;10;1;E28068940000403592B56C31;284;28.4;-62;-58;-56;0.2
+2026-10-24 14:40:11;balcao zigue-zague 10cm+30cm;18.00;10;1;E28069150000402D9DF10563;226;22.6;-60;-56;-54;0.2
+2026-10-24 14:42:23;balcao 6 normais 10-160cm + antimetal 190cm cortador;20.00;10;1;E28069150000402D9DF10563;267;26.7;-61;-56;-54;0.2
+2026-10-24 14:42:23;balcao 6 normais 10-160cm + antimetal 190cm cortador;20.00;10;1;E28068940000403592B56C31;269;26.9;-60;-57;-55;0.2
+2026-10-24 14:44:06;balcao 6 normais 10-160cm + antimetal 190cm cortador;22.00;10;1;E28068940000403592B56C31;263;26.3;-60;-57;-55;0.3
+2026-10-24 14:44:06;balcao 6 normais 10-160cm + antimetal 190cm cortador;22.00;10;1;E28069150000402D9DF10563;271;27.1;-57;-53;-51;0.3
+2026-10-24 14:45:21;balcao 6 normais 10-160cm + antimetal 190cm cortador;24.00;10;1;E28068940000403592B56C31;255;25.5;-59;-56;-54;0.2
+2026-10-24 14:45:21;balcao 6 normais 10-160cm + antimetal 190cm cortador;24.00;10;1;E28069150000402D9DF10563;265;26.5;-65;-53;-50;0.2
+2026-10-24 14:49:21;balcao 6 normais 10-160cm + antimetal 190cm cortador, antena em pe;24.00;10;1;E28069150000402D9DF10563;119;11.9;-63;-57;-51;0.2
+2026-10-24 14:49:21;balcao 6 normais 10-160cm + antimetal 190cm cortador, antena em pe;24.00;10;1;E28068940000403592B56C31;144;14.4;-52;-47;-43;0.2
+2026-10-24 14:53:47;tags em reta 10-160cm + antimetal 190cm cortador, antena em pe;24.00;10;1;E28069150000402D9DF10563;189;18.9;-67;-56;-50;0.2
+2026-10-24 14:53:47;tags em reta 10-160cm + antimetal 190cm cortador, antena em pe;24.00;10;1;E28068940000403592B56C31;185;18.5;-55;-44;-40;0.2
+2026-10-24 14:53:47;tags em reta 10-160cm + antimetal 190cm cortador, antena em pe;24.00;10;1;E2004713A77068213EC2010E;87;8.7;-71;-64;-59;0.2
+2026-10-24 14:56:43;tags em reta, antena na mao, orientacao A (como em pe);24.00;10;1;E28068940000403592B56C31;298;29.8;-48;-44;-42;0.2
+2026-10-24 14:56:43;tags em reta, antena na mao, orientacao A (como em pe);24.00;10;1;E28069150000402D9DF10563;75;7.5;-67;-64;-61;0.2
+2026-10-24 14:56:43;tags em reta, antena na mao, orientacao A (como em pe);24.00;10;1;E2004713A77068213EC2010E;73;7.3;-69;-65;-63;0.2
+2026-10-24 14:57:37;tags em reta, antena na mao, orientacao B (girada 90);24.00;10;1;E28068940000403592B56C31;277;27.7;-51;-48;-46;0.2
+2026-10-24 14:57:37;tags em reta, antena na mao, orientacao B (girada 90);24.00;10;1;E28069150000402D9DF10563;139;13.9;-65;-62;-60;0.2
+2026-10-24 14:57:37;tags em reta, antena na mao, orientacao B (girada 90);24.00;10;1;E2004713A77068213EC2010E;73;7.3;-66;-65;-63;0.2
+2026-10-24 14:57:37;tags em reta, antena na mao, orientacao B (girada 90);24.00;10;1;E2004713AA3068213EEE0111;32;3.2;-69;-67;-66;0.2
+2026-10-24 14:59:21;tags em reta, antena na mao, orientacao B (girada 90);26.00;10;1;E28069150000402D9DF10563;173;17.3;-69;-61;-55;0.2
+2026-10-24 14:59:21;tags em reta, antena na mao, orientacao B (girada 90);26.00;10;1;E28068940000403592B56C31;295;29.5;-57;-44;-42;0.2
+2026-10-24 14:59:21;tags em reta, antena na mao, orientacao B (girada 90);26.00;10;1;E2004713A77068213EC2010E;13;1.3;-71;-67;-65;0.2
+2026-10-24 15:05:59;tags em reta, antena presa no calendario, orientacao B;18.00;10;1;E28068940000403592B56C31;383;38.3;-59;-55;-52;0.2
+2026-10-24 15:07:01;tags em reta, antena presa no calendario, orientacao B;20.00;10;1;E28068940000403592B56C31;377;37.7;-58;-54;-51;0.2
+2026-10-24 15:07:16;tags em reta, antena presa no calendario, orientacao B;22.00;10;1;E28068940000403592B56C31;366;36.6;-56;-53;-50;0.3
+2026-10-24 15:07:30;tags em reta, antena presa no calendario, orientacao B;24.00;10;1;E2004713AA3068213EEE0111;7;0.7;-68;-67;-66;0.2
+2026-10-24 15:07:30;tags em reta, antena presa no calendario, orientacao B;24.00;10;1;E28068940000403592B56C31;354;35.4;-55;-53;-50;0.2
+2026-10-24 15:07:45;tags em reta, antena presa no calendario, orientacao B;26.00;10;1;E28068940000403592B56C31;282;28.2;-86;-54;-49;0.2
+2026-10-24 15:07:45;tags em reta, antena presa no calendario, orientacao B;26.00;10;1;E2004713AA3068213EEE0111;12;1.2;-77;-72;-65;0.2
+2026-10-24 15:07:45;tags em reta, antena presa no calendario, orientacao B;26.00;10;1;E20047066BF06027F7A20109;14;1.4;-74;-70;-67;0.2
+2026-10-24 15:07:45;tags em reta, antena presa no calendario, orientacao B;26.00;10;1;E2004713A77068213EC2010E;2;0.2;-73;-72;-72;0.2
